@@ -136,6 +136,10 @@
               </div>
               <div class="options-body">
                 <p>Use os controles para ativar som, configurar preferências e gerenciar sua conta.</p>
+                <div class="option-item checkbox-field">
+                  <input type="checkbox" id="powerup-toggle" checked />
+                  <label for="powerup-toggle">Ativar Power-ups</label>
+                </div>
                 <ul>
                   <li>Volume ambiente</li>
                   <li>Preferências de notificação</li>
@@ -176,117 +180,150 @@
       <div class="battle-screen screen hidden" id="battle-screen">
         <div class="battle-shell">
           <div class="battle-top">
-            <div id="ammo-counter" class="ammo-counter" aria-label="Contador de munição">
-              <span class="ammo-label">Munição</span>
-              <span class="ammo-value">12</span>
+            <div class="battle-metrics">
+              <div id="ammo-counter" class="ammo-counter" aria-label="Contador de munição">
+                <span class="ammo-label">Munição</span>
+                <span class="ammo-value">12</span>
+              </div>
+              <div class="battle-status-panel">
+                <span id="battle-status" class="battle-status" aria-live="polite">Aguardando início...</span>
+                <span class="battle-substatus">Mire bem antes de disparar</span>
+              </div>
             </div>
-            <div id="battle-status" class="battle-status" aria-live="polite">Aguardando inicío...</div>
             <button type="button" id="forfeit-button" class="secondary-button">Desistir</button>
           </div>
 
           <div class="board-frame">
-            <div id="board" class="board" aria-label="Mapa tático de batalha">
-              <!-- 10x10 grid -->
-              <div class="board-cell" data-cell="1"></div>
-              <div class="board-cell" data-cell="2"></div>
-              <div class="board-cell" data-cell="3"></div>
-              <div class="board-cell" data-cell="4"></div>
-              <div class="board-cell" data-cell="5"></div>
-              <div class="board-cell" data-cell="6"></div>
-              <div class="board-cell" data-cell="7"></div>
-              <div class="board-cell" data-cell="8"></div>
-              <div class="board-cell" data-cell="9"></div>
-              <div class="board-cell" data-cell="10"></div>
-              <div class="board-cell" data-cell="11"></div>
-              <div class="board-cell" data-cell="12"></div>
-              <div class="board-cell" data-cell="13"></div>
-              <div class="board-cell" data-cell="14"></div>
-              <div class="board-cell" data-cell="15"></div>
-              <div class="board-cell" data-cell="16"></div>
-              <div class="board-cell" data-cell="17"></div>
-              <div class="board-cell" data-cell="18"></div>
-              <div class="board-cell" data-cell="19"></div>
-              <div class="board-cell" data-cell="20"></div>
-              <div class="board-cell" data-cell="21"></div>
-              <div class="board-cell" data-cell="22"></div>
-              <div class="board-cell" data-cell="23"></div>
-              <div class="board-cell" data-cell="24"></div>
-              <div class="board-cell" data-cell="25"></div>
-              <div class="board-cell" data-cell="26"></div>
-              <div class="board-cell" data-cell="27"></div>
-              <div class="board-cell" data-cell="28"></div>
-              <div class="board-cell" data-cell="29"></div>
-              <div class="board-cell" data-cell="30"></div>
-              <div class="board-cell" data-cell="31"></div>
-              <div class="board-cell" data-cell="32"></div>
-              <div class="board-cell" data-cell="33"></div>
-              <div class="board-cell" data-cell="34"></div>
-              <div class="board-cell" data-cell="35"></div>
-              <div class="board-cell" data-cell="36"></div>
-              <div class="board-cell" data-cell="37"></div>
-              <div class="board-cell" data-cell="38"></div>
-              <div class="board-cell" data-cell="39"></div>
-              <div class="board-cell" data-cell="40"></div>
-              <div class="board-cell" data-cell="41"></div>
-              <div class="board-cell" data-cell="42"></div>
-              <div class="board-cell" data-cell="43"></div>
-              <div class="board-cell" data-cell="44"></div>
-              <div class="board-cell" data-cell="45"></div>
-              <div class="board-cell" data-cell="46"></div>
-              <div class="board-cell" data-cell="47"></div>
-              <div class="board-cell" data-cell="48"></div>
-              <div class="board-cell" data-cell="49"></div>
-              <div class="board-cell" data-cell="50"></div>
-              <div class="board-cell" data-cell="51"></div>
-              <div class="board-cell" data-cell="52"></div>
-              <div class="board-cell" data-cell="53"></div>
-              <div class="board-cell" data-cell="54"></div>
-              <div class="board-cell" data-cell="55"></div>
-              <div class="board-cell" data-cell="56"></div>
-              <div class="board-cell" data-cell="57"></div>
-              <div class="board-cell" data-cell="58"></div>
-              <div class="board-cell" data-cell="59"></div>
-              <div class="board-cell" data-cell="60"></div>
-              <div class="board-cell" data-cell="61"></div>
-              <div class="board-cell" data-cell="62"></div>
-              <div class="board-cell" data-cell="63"></div>
-              <div class="board-cell" data-cell="64"></div>
-              <div class="board-cell" data-cell="65"></div>
-              <div class="board-cell" data-cell="66"></div>
-              <div class="board-cell" data-cell="67"></div>
-              <div class="board-cell" data-cell="68"></div>
-              <div class="board-cell" data-cell="69"></div>
-              <div class="board-cell" data-cell="70"></div>
-              <div class="board-cell" data-cell="71"></div>
-              <div class="board-cell" data-cell="72"></div>
-              <div class="board-cell" data-cell="73"></div>
-              <div class="board-cell" data-cell="74"></div>
-              <div class="board-cell" data-cell="75"></div>
-              <div class="board-cell" data-cell="76"></div>
-              <div class="board-cell" data-cell="77"></div>
-              <div class="board-cell" data-cell="78"></div>
-              <div class="board-cell" data-cell="79"></div>
-              <div class="board-cell" data-cell="80"></div>
-              <div class="board-cell" data-cell="81"></div>
-              <div class="board-cell" data-cell="82"></div>
-              <div class="board-cell" data-cell="83"></div>
-              <div class="board-cell" data-cell="84"></div>
-              <div class="board-cell" data-cell="85"></div>
-              <div class="board-cell" data-cell="86"></div>
-              <div class="board-cell" data-cell="87"></div>
-              <div class="board-cell" data-cell="88"></div>
-              <div class="board-cell" data-cell="89"></div>
-              <div class="board-cell" data-cell="90"></div>
-              <div class="board-cell" data-cell="91"></div>
-              <div class="board-cell" data-cell="92"></div>
-              <div class="board-cell" data-cell="93"></div>
-              <div class="board-cell" data-cell="94"></div>
-              <div class="board-cell" data-cell="95"></div>
-              <div class="board-cell" data-cell="96"></div>
-              <div class="board-cell" data-cell="97"></div>
-              <div class="board-cell" data-cell="98"></div>
-              <div class="board-cell" data-cell="99"></div>
-              <div class="board-cell" data-cell="100"></div>
+            <div class="board-shell">
+              <div class="board-row-labels" aria-hidden="true">
+                <span>1</span>
+                <span>2</span>
+                <span>3</span>
+                <span>4</span>
+                <span>5</span>
+                <span>6</span>
+                <span>7</span>
+                <span>8</span>
+                <span>9</span>
+                <span>10</span>
+              </div>
+              <div class="board-content">
+                <div class="board-column-labels" aria-hidden="true">
+                  <span>A</span>
+                  <span>B</span>
+                  <span>C</span>
+                  <span>D</span>
+                  <span>E</span>
+                  <span>F</span>
+                  <span>G</span>
+                  <span>H</span>
+                  <span>I</span>
+                  <span>J</span>
+                </div>
+                <div id="board" class="board" aria-label="Mapa tático de batalha">
+                  <!-- 10x10 grid -->
+                  <div class="board-cell" data-cell="1"></div>
+                  <div class="board-cell" data-cell="2"></div>
+                  <div class="board-cell" data-cell="3"></div>
+                  <div class="board-cell" data-cell="4"></div>
+                  <div class="board-cell" data-cell="5"></div>
+                  <div class="board-cell" data-cell="6"></div>
+                  <div class="board-cell" data-cell="7"></div>
+                  <div class="board-cell" data-cell="8"></div>
+                  <div class="board-cell" data-cell="9"></div>
+                  <div class="board-cell" data-cell="10"></div>
+                  <div class="board-cell" data-cell="11"></div>
+                  <div class="board-cell" data-cell="12"></div>
+                  <div class="board-cell" data-cell="13"></div>
+                  <div class="board-cell" data-cell="14"></div>
+                  <div class="board-cell" data-cell="15"></div>
+                  <div class="board-cell" data-cell="16"></div>
+                  <div class="board-cell" data-cell="17"></div>
+                  <div class="board-cell" data-cell="18"></div>
+                  <div class="board-cell" data-cell="19"></div>
+                  <div class="board-cell" data-cell="20"></div>
+                  <div class="board-cell" data-cell="21"></div>
+                  <div class="board-cell" data-cell="22"></div>
+                  <div class="board-cell" data-cell="23"></div>
+                  <div class="board-cell" data-cell="24"></div>
+                  <div class="board-cell" data-cell="25"></div>
+                  <div class="board-cell" data-cell="26"></div>
+                  <div class="board-cell" data-cell="27"></div>
+                  <div class="board-cell" data-cell="28"></div>
+                  <div class="board-cell" data-cell="29"></div>
+                  <div class="board-cell" data-cell="30"></div>
+                  <div class="board-cell" data-cell="31"></div>
+                  <div class="board-cell" data-cell="32"></div>
+                  <div class="board-cell" data-cell="33"></div>
+                  <div class="board-cell" data-cell="34"></div>
+                  <div class="board-cell" data-cell="35"></div>
+                  <div class="board-cell" data-cell="36"></div>
+                  <div class="board-cell" data-cell="37"></div>
+                  <div class="board-cell" data-cell="38"></div>
+                  <div class="board-cell" data-cell="39"></div>
+                  <div class="board-cell" data-cell="40"></div>
+                  <div class="board-cell" data-cell="41"></div>
+                  <div class="board-cell" data-cell="42"></div>
+                  <div class="board-cell" data-cell="43"></div>
+                  <div class="board-cell" data-cell="44"></div>
+                  <div class="board-cell" data-cell="45"></div>
+                  <div class="board-cell" data-cell="46"></div>
+                  <div class="board-cell" data-cell="47"></div>
+                  <div class="board-cell" data-cell="48"></div>
+                  <div class="board-cell" data-cell="49"></div>
+                  <div class="board-cell" data-cell="50"></div>
+                  <div class="board-cell" data-cell="51"></div>
+                  <div class="board-cell" data-cell="52"></div>
+                  <div class="board-cell" data-cell="53"></div>
+                  <div class="board-cell" data-cell="54"></div>
+                  <div class="board-cell" data-cell="55"></div>
+                  <div class="board-cell" data-cell="56"></div>
+                  <div class="board-cell" data-cell="57"></div>
+                  <div class="board-cell" data-cell="58"></div>
+                  <div class="board-cell" data-cell="59"></div>
+                  <div class="board-cell" data-cell="60"></div>
+                  <div class="board-cell" data-cell="61"></div>
+                  <div class="board-cell" data-cell="62"></div>
+                  <div class="board-cell" data-cell="63"></div>
+                  <div class="board-cell" data-cell="64"></div>
+                  <div class="board-cell" data-cell="65"></div>
+                  <div class="board-cell" data-cell="66"></div>
+                  <div class="board-cell" data-cell="67"></div>
+                  <div class="board-cell" data-cell="68"></div>
+                  <div class="board-cell" data-cell="69"></div>
+                  <div class="board-cell" data-cell="70"></div>
+                  <div class="board-cell" data-cell="71"></div>
+                  <div class="board-cell" data-cell="72"></div>
+                  <div class="board-cell" data-cell="73"></div>
+                  <div class="board-cell" data-cell="74"></div>
+                  <div class="board-cell" data-cell="75"></div>
+                  <div class="board-cell" data-cell="76"></div>
+                  <div class="board-cell" data-cell="77"></div>
+                  <div class="board-cell" data-cell="78"></div>
+                  <div class="board-cell" data-cell="79"></div>
+                  <div class="board-cell" data-cell="80"></div>
+                  <div class="board-cell" data-cell="81"></div>
+                  <div class="board-cell" data-cell="82"></div>
+                  <div class="board-cell" data-cell="83"></div>
+                  <div class="board-cell" data-cell="84"></div>
+                  <div class="board-cell" data-cell="85"></div>
+                  <div class="board-cell" data-cell="86"></div>
+                  <div class="board-cell" data-cell="87"></div>
+                  <div class="board-cell" data-cell="88"></div>
+                  <div class="board-cell" data-cell="89"></div>
+                  <div class="board-cell" data-cell="90"></div>
+                  <div class="board-cell" data-cell="91"></div>
+                  <div class="board-cell" data-cell="92"></div>
+                  <div class="board-cell" data-cell="93"></div>
+                  <div class="board-cell" data-cell="94"></div>
+                  <div class="board-cell" data-cell="95"></div>
+                  <div class="board-cell" data-cell="96"></div>
+                  <div class="board-cell" data-cell="97"></div>
+                  <div class="board-cell" data-cell="98"></div>
+                  <div class="board-cell" data-cell="99"></div>
+                  <div class="board-cell" data-cell="100"></div>
+                </div>
+              </div>
             </div>
             <div id="periscope-reticle" class="periscope-reticle"></div>
           </div>

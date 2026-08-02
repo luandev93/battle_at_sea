@@ -42,7 +42,18 @@ let isSoloMode = false;
 let botAI = null;
 let soloEnemyFleet = null;
 let playerFleet = null;
+let enemyPowerUps = new Map();
+let playerPowerUps = new Map();
+let extraShotActive = false;
+let powerUpsEnabled = true;
+const powerUpTypes = ['extra_shot', 'revive_ship', 'reposition_ship'];
+const powerUpLabels = {
+  extra_shot: 'Tiro Extra',
+  revive_ship: 'Reviver Navio',
+  reposition_ship: 'Reposicionar Navio',
+};
 const startSoloButton = document.getElementById('start-solo-button');
+const powerUpToggle = document.getElementById('powerup-toggle');
 const battleStatus = document.getElementById('battle-status');
 const forfeitButton = document.getElementById('forfeit-button');
 const lobbyVideo = document.getElementById('lobby-video');
@@ -87,6 +98,177 @@ function shuffle(array) {
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
+}
+
+function getWaterCells(fleet) {
+  const cells = [];
+  for (let row = 0; row < 10; row += 1) {
+    for (let col = 0; col < 10; col += 1) {
+      if (!fleet.grid[row][col]) {
+        cells.push(coordToCellId(row, col));
+      }
+    }
+  }
+  return cells;
+}
+
+function pickPowerUpCells(fleet, count = 4) {
+  const waterCells = getWaterCells(fleet);
+  const selected = new Map();
+  shuffle(waterCells);
+  for (let i = 0; i < Math.min(count, waterCells.length); i += 1) {
+    const type = powerUpTypes[i % powerUpTypes.length];
+    selected.set(waterCells[i], type);
+  }
+  return selected;
+}
+
+function markPowerUpCell(cellId) {
+  const cell = board?.querySelector(`[data-cell="${cellId}"]`);
+  if (!cell) return;
+  cell.classList.add('board-cell-powerup');
+}
+
+function clearPowerUpMarkers() {
+  board?.querySelectorAll('.board-cell-powerup').forEach((cell) => {
+    cell.classList.remove('board-cell-powerup');
+  });
+}
+
+function fleetCanPlace(fleet, coords) {
+  return coords.every(({ row, col }) => fleet.grid[row][col] === null);
+}
+
+function revivePlayerShip() {
+  if (!playerFleet) return false;
+  const damagedShip = playerFleet.ships.find((ship) => ship.hits.size > 0);
+  if (!damagedShip) return false;
+  damagedShip.hits.clear();
+  damagedShip.coords.forEach(({ row, col }) => {
+    const cell = board?.querySelector(`[data-cell="${coordToCellId(row, col)}"]`);
+    cell?.classList.remove('board-cell-sunk', 'board-cell-fleet-hit', 'board-cell-bot-hit');
+  });
+  return true;
+}
+
+function repositionPlayerShip() {
+  if (!playerFleet) return false;
+  const candidates = shuffle([...playerFleet.ships]).filter((ship) => ship.hits.size < ship.size);
+  for (const ship of candidates) {
+    const blueprint = getBlueprint(ship.type);
+    if (!blueprint) continue;
+
+    ship.coords.forEach(({ row, col }) => {
+      playerFleet.grid[row][col] = null;
+    });
+
+    const availableCells = [];
+    for (let row = 0; row < 10; row += 1) {
+      for (let col = 0; col < 10; col += 1) {
+        const cellId = coordToCellId(row, col);
+        ['horizontal', 'vertical'].forEach((orientation) => {
+          [1, -1].forEach((dir) => {
+            const coords = coordsForPlacement(cellId, { type: ship.type }, orientation, dir);
+            if (coords && fleetCanPlace(playerFleet, coords)) {
+              availableCells.push(coords);
+            }
+          });
+        });
+      }
+    }
+
+    if (availableCells.length === 0) {
+      ship.coords.forEach(({ row, col }) => {
+        playerFleet.grid[row][col] = ship;
+      });
+      continue;
+    }
+
+    const newCoords = availableCells[Math.floor(Math.random() * availableCells.length)];
+    ship.coords = newCoords;
+    ship.hits.clear();
+    newCoords.forEach(({ row, col }) => {
+      playerFleet.grid[row][col] = ship;
+    });
+    return true;
+  }
+  return false;
+}
+
+function setPowerUpsEnabled(value) {
+  powerUpsEnabled = Boolean(value);
+  if (!powerUpsEnabled) {
+    playerPowerUps.clear();
+    enemyPowerUps.clear();
+    clearPowerUpMarkers();
+  }
+  if (powerUpToggle) {
+    powerUpToggle.checked = powerUpsEnabled;
+  }
+}
+
+function activatePowerUp(type, triggeredByPlayer) {
+  if (!powerUpsEnabled) {
+    return false;
+  }
+
+  switch (type) {
+    case 'extra_shot':
+      extraShotActive = true;
+      canShoot = true;
+      if (reloadInterval) {
+        clearInterval(reloadInterval);
+        reloadInterval = null;
+      }
+      resetAmmoDisplay();
+      setBattleStatus(`Surpresa! ${powerUpLabels[type]} concedido. Dispare novamente.`);
+      return true;
+    case 'revive_ship':
+      if (revivePlayerShip()) {
+        setBattleStatus(`Surpresa! ${powerUpLabels[type]} ativado. Um navio aliado foi restaurado.`);
+        return true;
+      }
+      setBattleStatus(`Surpresa! ${powerUpLabels[type]} encontrado, mas não havia navios para reviver.`);
+      return false;
+    case 'reposition_ship':
+      if (repositionPlayerShip()) {
+        setBattleStatus(`Surpresa! ${powerUpLabels[type]} ativado. Um navio aliado foi reposicionado.`);
+        return true;
+      }
+      setBattleStatus(`Surpresa! ${powerUpLabels[type]} encontrado, mas não foi possível reposicionar.`);
+      return false;
+    default:
+      return false;
+  }
+}
+
+function maybeActivatePowerUp(cellId, triggeredByPlayer) {
+  if (!powerUpsEnabled) {
+    return null;
+  }
+
+  const sourceMap = triggeredByPlayer ? enemyPowerUps : playerPowerUps;
+  if (!sourceMap.has(cellId)) {
+    return null;
+  }
+
+  const type = sourceMap.get(cellId);
+  sourceMap.delete(cellId);
+  markPowerUpCell(cellId);
+  activatePowerUp(type, triggeredByPlayer);
+  return type;
+}
+
+function setupSoloPowerUps() {
+  if (!playerFleet || !soloEnemyFleet) return;
+  clearPowerUpMarkers();
+  if (!powerUpsEnabled) {
+    playerPowerUps.clear();
+    enemyPowerUps.clear();
+    return;
+  }
+  playerPowerUps = pickPowerUpCells(playerFleet, 4);
+  enemyPowerUps = pickPowerUpCells(soloEnemyFleet, 4);
 }
 
 class BotAI {
@@ -220,13 +402,24 @@ function applyShotToFleet(fleet, cellId) {
   const ship = fleet.grid[row][col];
 
   if (!ship) {
-    return { hit: false, sunk: false };
+    return { hit: false, sunk: false, ship: null };
   }
 
   const coordKey = `${row},${col}`;
   ship.hits.add(coordKey);
   const sunk = ship.hits.size === ship.size;
-  return { hit: true, sunk };
+  return { hit: true, sunk, ship };
+}
+
+function markSunkShipCells(ship) {
+  if (!ship || !ship.coords) {
+    return;
+  }
+
+  ship.coords.forEach(({ row, col }) => {
+    const sunkCell = board?.querySelector(`[data-cell="${coordToCellId(row, col)}"]`);
+    sunkCell?.classList.add('board-cell-sunk');
+  });
 }
 
 function isFleetSunk(fleet) {
@@ -235,7 +428,15 @@ function isFleetSunk(fleet) {
 
 function clearBoardShots() {
   board?.querySelectorAll('.board-cell').forEach((cell) => {
-    cell.classList.remove('board-cell-shot', 'board-cell-miss', 'board-cell-bot-hit', 'board-cell-bot-miss', 'board-cell-fleet-hit');
+    cell.classList.remove(
+      'board-cell-shot',
+      'board-cell-miss',
+      'board-cell-hit',
+      'board-cell-bot-hit',
+      'board-cell-bot-miss',
+      'board-cell-fleet-hit',
+      'board-cell-sunk'
+    );
     delete cell.dataset.shot;
   });
 }
@@ -248,9 +449,11 @@ function startSoloMode() {
   isSoloMode = true;
   botAI = new BotAI(10);
   soloEnemyFleet = createFleet();
+  setupSoloPowerUps();
   // playerFleet set from saved placement
   isPlayerTurn = true;
   canShoot = true;
+  extraShotActive = false;
   clearBoardShots();
   showBattleScreen();
   setBattleStatus('Modo solo iniciado. Sua vez.');
@@ -265,8 +468,25 @@ function processPlayerShot(cell) {
 
   cell.dataset.shot = 'true';
   const cellId = cell.dataset.cell;
-  const { hit, sunk } = applyShotToFleet(soloEnemyFleet, cellId);
-  highlightCell(cell, hit ? 'board-cell-shot' : 'board-cell-miss');
+  const powerUpType = maybeActivatePowerUp(cellId, true);
+  const { hit, sunk, ship } = applyShotToFleet(soloEnemyFleet, cellId);
+
+  if (hit) {
+    cell.classList.add('board-cell-hit');
+    if (sunk && ship) {
+      ship.coords.forEach(({ row, col }) => {
+        const sunkCell = board?.querySelector(`[data-cell="${coordToCellId(row, col)}"]`);
+        sunkCell?.classList.add('board-cell-sunk');
+      });
+    }
+  } else {
+    cell.classList.add('board-cell-miss');
+  }
+
+  if (powerUpType === 'extra_shot') {
+    setBattleStatus(`Tiro Extra ativado! Dispare novamente sem perder o turno.`);
+    return;
+  }
 
   setBattleStatus(hit ? 'Acertou! Aguarde a vez do bot...' : 'Água! Agora é a vez do bot.');
 
@@ -297,11 +517,25 @@ function botTakeTurn() {
 
   try { playEnemyShotSound(); } catch (e) {}
 
+  const powerUpType = maybeActivatePowerUp(shotId, false);
   const { hit, sunk } = applyShotToFleet(playerFleet, shotId);
   botAI.recordResult(shotId, hit, sunk);
 
   if (cell) {
-    highlightCell(cell, hit ? 'board-cell-bot-hit' : 'board-cell-bot-miss');
+    if (hit) {
+      cell.classList.add('board-cell-bot-hit');
+      if (sunk) {
+        const ship = playerFleet.grid[cellIdToCoord(shotId).row][cellIdToCoord(shotId).col];
+        if (ship) {
+          ship.coords.forEach(({ row, col }) => {
+            const sunkCell = board?.querySelector(`[data-cell="${coordToCellId(row, col)}"]`);
+            sunkCell?.classList.add('board-cell-sunk');
+          });
+        }
+      }
+    } else {
+      cell.classList.add('board-cell-bot-miss');
+    }
   }
 
   if (hit && sunk && isFleetSunk(playerFleet)) {
@@ -1284,17 +1518,27 @@ socket.on('opponent_fire', ({ cell, shooterIndex }) => {
   let hit = false;
   let sunk = false;
   let defeated = false;
+  let ship = null;
   if (playerFleet) {
-    const { hit: h, sunk: s } = applyShotToFleet(playerFleet, cell);
-    hit = h; sunk = s;
-    if (s && isFleetSunk(playerFleet)) {
+    const result = applyShotToFleet(playerFleet, cell);
+    hit = result.hit;
+    sunk = result.sunk;
+    ship = result.ship;
+    if (sunk && isFleetSunk(playerFleet)) {
       defeated = true;
     }
   }
   // mark our board for the opponent's shot
   if (cellEl) {
     cellEl.dataset.shot = 'true';
-    cellEl.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
+    if (hit) {
+      cellEl.classList.add('board-cell-bot-hit');
+      if (sunk && ship) {
+        markSunkShipCells(ship);
+      }
+    } else {
+      cellEl.classList.add('board-cell-miss');
+    }
   }
   // play enemy shot sound
   try { playEnemyShotSound(); } catch (e) {}
@@ -1371,18 +1615,19 @@ socket.on('shot_result', (payload) => {
   if (targetCell) {
     if (typeof hit !== 'undefined') {
       if (isShooter) {
-        targetCell.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
+        targetCell.classList.add(hit ? 'board-cell-hit' : 'board-cell-miss');
       } else {
-        targetCell.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
+        targetCell.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-miss');
       }
       if (sunk) {
         setBattleStatus(isShooter ? 'Você afundou um navio!' : 'Seu navio foi afundado!');
+        targetCell.classList.add('board-cell-sunk');
       }
       if (defeated) {
         setBattleStatus(winner === playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
       }
     } else {
-      highlightCell(targetCell, isShooter ? 'board-cell-shot' : 'board-cell-fleet-hit');
+      targetCell.classList.add(isShooter ? 'board-cell-miss' : 'board-cell-miss');
     }
   }
   isPlayerTurn = playerIndex === nextTurn;
@@ -1444,6 +1689,9 @@ logoutButton?.addEventListener('click', logout);
 toggleAudioButton?.addEventListener('click', toggleLobbyAudio);
 optionsButton?.addEventListener('click', openOptions);
 closeOptionsButton?.addEventListener('click', closeOptions);
+powerUpToggle?.addEventListener('change', (event) => {
+  setPowerUpsEnabled(event.target.checked);
+});
 forfeitButton?.addEventListener('click', handleForfeit);
 fleetConfigButton?.addEventListener('click', () => {
   openFleetModal();
