@@ -267,8 +267,15 @@ button:hover {
   height: 100%;
   object-fit: cover;
   z-index: 0;
-  filter: saturate(0.2) brightness(0.5) contrast(0.95) grayscale(0.15);
-  opacity: 0.55;
+  filter: saturate(1) brightness(0.85) contrast(1.05);
+  opacity: 0.85;
+}
+
+.cannon-image {
+  width: 100%;
+  height: auto;
+  max-width: 220px;
+  display: block;
 }
 
 .lobby-overlay {

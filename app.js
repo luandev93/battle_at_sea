@@ -42,11 +42,10 @@ let isSoloMode = false;
 let botAI = null;
 let soloEnemyFleet = null;
 let playerFleet = null;
-const shipSizes = [5, 4, 3, 3, 2];
 const startSoloButton = document.getElementById('start-solo-button');
 const battleStatus = document.getElementById('battle-status');
 const forfeitButton = document.getElementById('forfeit-button');
-const lobbyAudio = document.getElementById('lobby-audio');
+const lobbyVideo = document.getElementById('lobby-video');
 const toggleAudioButton = document.getElementById('toggle-audio-button');
 const logoutButton = document.getElementById('logout-button');
 const optionsButton = document.getElementById('options-button');
@@ -175,43 +174,43 @@ class BotAI {
 function createFleet() {
   const grid = Array.from({ length: 10 }, () => Array(10).fill(null));
   const ships = [];
+  const blueprintShips = [];
 
-  for (const size of shipSizes) {
+  fleetBlueprints.forEach((blueprint) => {
+    const count = blueprint.count || 1;
+    for (let i = 0; i < count; i += 1) {
+      blueprintShips.push({ id: `s${blueprintShips.length}`, type: blueprint.type, coords: [], orientation: 'horizontal', dir: 1 });
+    }
+  });
+
+  const shipsToPlace = [...blueprintShips].sort((a, b) => {
+    return (getBlueprint(b.type)?.pattern.length || 0) - (getBlueprint(a.type)?.pattern.length || 0);
+  });
+
+  shipsToPlace.forEach((ship) => {
     let placed = false;
-    const attemptLimit = 200;
     let attempts = 0;
-
-    while (!placed && attempts < attemptLimit) {
+    while (!placed && attempts < 400) {
       attempts += 1;
-      const horizontal = Math.random() < 0.5;
       const row = Math.floor(Math.random() * 10);
       const col = Math.floor(Math.random() * 10);
-      const coords = [];
-
-      for (let offset = 0; offset < size; offset += 1) {
-        const r = horizontal ? row : row + offset;
-        const c = horizontal ? col + offset : col;
-        if (r >= 10 || c >= 10 || grid[r][c] !== null) {
-          coords.length = 0;
-          break;
-        }
-        coords.push({ row: r, col: c });
-      }
-
-      if (coords.length === size) {
-        const ship = {
-          size,
-          coords,
-          hits: new Set(),
-        };
-        ships.push(ship);
-        coords.forEach(({ row: r, col: c }) => {
-          grid[r][c] = ship;
-        });
-        placed = true;
-      }
+      const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const cellId = coordToCellId(row, col);
+      const coords = coordsForPlacement(cellId, ship, orientation, dir);
+      if (!coords || coords.some(({ row: r, col: c }) => grid[r][c] !== null)) continue;
+      ship.coords = coords;
+      ship.orientation = orientation;
+      ship.dir = dir;
+      ship.size = coords.length;
+      ship.hits = new Set();
+      coords.forEach(({ row: r, col: c }) => {
+        grid[r][c] = ship;
+      });
+      ships.push(ship);
+      placed = true;
     }
-  }
+  });
 
   return { grid, ships };
 }
@@ -370,13 +369,12 @@ function setAudioMuted(value) {
     toggleAudioButton.textContent = audioMuted ? 'Som: Mudo' : 'Som: Ligado';
     toggleAudioButton.classList.toggle('active', !audioMuted);
   }
-  if (audioMuted) {
-    stopAmbientSound();
-  } else {
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+  if (lobbyVideo) {
+    lobbyVideo.muted = audioMuted;
+    lobbyVideo.volume = audioMuted ? 0 : 1;
+    if (!audioMuted) {
+      lobbyVideo.play().catch(() => {});
     }
-    startAmbientSound();
   }
 }
 
@@ -541,19 +539,21 @@ async function loadFleetFromFirestore(id) {
     if (!snap.exists()) return null;
     const data = snap.data();
     if (data.fleet && Array.isArray(data.fleet)) {
-      // map into placement structure
       initPlacement();
       data.fleet.forEach((s, idx) => {
         if (placement.ships[idx]) {
           placement.ships[idx].coords = s.coords || [];
           placement.ships[idx].orientation = s.orientation || placement.ships[idx].orientation;
-          placement.ships[idx].size = s.size || placement.ships[idx].size;
-          placement.ships[idx].id = placement.ships[idx].id;
-          placement.ships[idx].coords.forEach(({ row, col }) => (placement.grid[row][col] = placement.ships[idx].id));
+          placement.ships[idx].dir = s.dir || placement.ships[idx].dir;
+          placement.ships[idx].type = s.type || placement.ships[idx].type;
+          placement.ships[idx].coords.forEach(({ row, col }) => {
+            if (placement.grid[row] && placement.grid[row][col] === null) {
+              placement.grid[row][col] = placement.ships[idx].id;
+            }
+          });
         }
       });
       renderPlacementToDOM();
-      // mark saved and build playerFleet
       fleetSaved = true;
       playerFleet = buildPlayerFleetFromPlacement();
       if (fleetConfigStatus) fleetConfigStatus.textContent = 'Frota carregada.';
@@ -601,12 +601,11 @@ function awardPoints(amount, type = 'generic') {
 
 function playLobbyAudio() {
   if (audioMuted) return;
-  try {
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-  } catch (e) {}
-  startAmbientSound();
+  if (lobbyVideo) {
+    lobbyVideo.muted = false;
+    lobbyVideo.volume = 1;
+    lobbyVideo.play().catch(() => {});
+  }
 }
 
 function handleForfeit() {
@@ -625,14 +624,12 @@ function handleForfeit() {
 }
 
 function pauseLobbyAudio() {
-  stopAmbientSound();
+  if (lobbyVideo) {
+    lobbyVideo.pause();
+  }
 }
 
 function toggleLobbyAudio() {
-  if (!audioCtx) initAudioContext();
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
   setAudioMuted(!audioMuted);
 }
 
@@ -911,12 +908,148 @@ const closeFleetBtn = document.getElementById('close-fleet');
 let fleetSaved = false;
 let placingOrientation = 'horizontal'; // or 'vertical'
 let placingDir = 1; // 1 forward, -1 reverse
-const fleetSizesLocal = [5, 4, 3, 3, 2];
-let placement = null; // { grid: 10x10 null or shipId, ships: [{id,size,coords,orientation}] }
+let placement = null; // { grid: 10x10 null or shipId, ships: [{id,type,coords,orientation}] }
+
+const fleetBlueprints = [
+  {
+    type: 'admiral',
+    label: 'Navio Almirante',
+    count: 1,
+    pattern: [
+      { row: 0, col: 1 },
+      { row: 0, col: 3 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+      { row: 1, col: 3 },
+      { row: 1, col: 4 },
+    ],
+  },
+  {
+    type: 'hospital',
+    label: 'Navio Hospital',
+    count: 1,
+    pattern: [
+      { row: 0, col: 2 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+      { row: 1, col: 3 },
+      { row: 1, col: 4 },
+    ],
+  },
+  {
+    type: 'aircraft',
+    label: 'Avião',
+    count: 1,
+    pattern: [
+      { row: 0, col: 1 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+      { row: 1, col: 3 },
+      { row: 1, col: 4 },
+      { row: 2, col: 1 },
+      { row: 3, col: 1 },
+    ],
+  },
+  {
+    type: 'destroyer',
+    label: 'Destroyer',
+    count: 2,
+    pattern: [
+      { row: 0, col: 1 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+    ],
+  },
+  {
+    type: 'torpedo',
+    label: 'Torpedoeiro',
+    count: 3,
+    pattern: [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+    ],
+  },
+  {
+    type: 'carrier',
+    label: 'Porta-Aviões',
+    count: 1,
+    pattern: [
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+      { row: 0, col: 3 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+      { row: 1, col: 3 },
+      { row: 1, col: 4 },
+      { row: 2, col: 2 },
+    ],
+  },
+  {
+    type: 'submarine',
+    label: 'Submarino',
+    count: 4,
+    pattern: [
+      { row: 0, col: 0 },
+    ],
+  },
+];
+
+function getBlueprint(type) {
+  return fleetBlueprints.find((bp) => bp.type === type);
+}
+
+function getShipLabel(ship) {
+  const bp = getBlueprint(ship.type);
+  return bp?.label || 'Navio';
+}
+
+function getShipShortLabel(ship) {
+  const labels = {
+    admiral: 'A',
+    hospital: 'H',
+    aircraft: 'V',
+    destroyer: 'D',
+    torpedo: 'T',
+    carrier: 'P',
+    submarine: 'S',
+  };
+  return labels[ship.type] || ship.id;
+}
+
+function normalizePattern(pattern) {
+  const minRow = Math.min(...pattern.map((p) => p.row));
+  const minCol = Math.min(...pattern.map((p) => p.col));
+  return pattern.map((p) => ({ row: p.row - minRow, col: p.col - minCol }));
+}
+
+function orientedPattern(pattern, orientation, dir) {
+  let coords = pattern.map(({ row, col }) => ({ row, col }));
+  if (orientation === 'vertical') {
+    coords = coords.map(({ row, col }) => ({ row: col, col: -row }));
+  }
+  if (dir === -1) {
+    const maxCol = Math.max(...coords.map((c) => c.col));
+    coords = coords.map(({ row, col }) => ({ row, col: maxCol - col }));
+  }
+  return normalizePattern(coords);
+}
 
 function initPlacement() {
   const grid = Array.from({ length: 10 }, () => Array(10).fill(null));
-  const ships = fleetSizesLocal.map((size, i) => ({ id: `s${i}`, size, coords: [], orientation: 'horizontal' }));
+  const ships = [];
+
+  fleetBlueprints.forEach((blueprint) => {
+    const count = blueprint.count || 1;
+    for (let i = 0; i < count; i += 1) {
+      ships.push({ id: `s${ships.length}`, type: blueprint.type, coords: [], orientation: 'horizontal', dir: 1 });
+    }
+  });
+
   placement = { grid, ships };
 }
 
@@ -941,38 +1074,50 @@ function renderInventory() {
   if (!fleetInventory) return;
   fleetInventory.innerHTML = '';
   placement.ships.forEach((ship) => {
+    const label = getShipLabel(ship);
     const el = document.createElement('div');
-    el.className = 'fleet-ship';
+    el.className = `fleet-ship fleet-ship-${ship.type}`;
     el.draggable = true;
     el.dataset.shipId = ship.id;
-    el.textContent = `Navio (${ship.size})`;
+    el.innerHTML = `<strong>${label}</strong><span class="ship-size">${getBlueprint(ship.type)?.pattern.length || 0} peças</span>`;
     el.addEventListener('dragstart', (ev) => {
       ev.dataTransfer.setData('text/plain', ship.id);
     });
     fleetInventory.appendChild(el);
   });
 }
-
-function coordsForPlacement(startCellId, size, orientation, dir) {
-  const { row, col } = cellIdToCoord(startCellId);
-  const coords = [];
-  for (let i = 0; i < size; i += 1) {
-    const r = orientation === 'horizontal' ? row : row + i * dir;
-    const c = orientation === 'horizontal' ? col + i * dir : col;
-    if (r < 0 || r >= 10 || c < 0 || c >= 10) return null;
-    coords.push({ row: r, col: c });
-  }
-  return coords;
-}
-
 function canPlace(coords) {
   return coords.every(({ row, col }) => placement.grid[row][col] === null);
+}
+
+function rotateAndFlipPattern(pattern, orientation, dir) {
+  let coords = pattern.map(({ row, col }) => ({ row, col }));
+  if (orientation === 'vertical') {
+    coords = coords.map(({ row, col }) => ({ row: col, col: -row }));
+  }
+  if (dir === -1) {
+    coords = coords.map(({ row, col }) => ({ row, col: -col }));
+  }
+  const minRow = Math.min(...coords.map((c) => c.row));
+  const minCol = Math.min(...coords.map((c) => c.col));
+  return coords.map(({ row, col }) => ({ row: row - minRow, col: col - minCol }));
+}
+
+function coordsForPlacement(startCellId, ship, orientation, dir) {
+  const blueprint = getBlueprint(ship.type);
+  if (!blueprint) return null;
+  const base = rotateAndFlipPattern(blueprint.pattern, orientation, dir);
+  const { row, col } = cellIdToCoord(startCellId);
+  const coords = base.map((cell) => ({ row: row + cell.row, col: col + cell.col }));
+  if (coords.some(({ row: r, col: c }) => r < 0 || r >= 10 || c < 0 || c >= 10)) {
+    return null;
+  }
+  return coords;
 }
 
 function placeShip(shipId, coords, orientation) {
   const ship = placement.ships.find((s) => s.id === shipId);
   if (!ship) return false;
-  // clear previous
   ship.coords.forEach(({ row, col }) => {
     placement.grid[row][col] = null;
   });
@@ -986,15 +1131,15 @@ function placeShip(shipId, coords, orientation) {
 }
 
 function renderPlacementToDOM() {
-  // update fleet grid cells
   const cells = fleetGridEl?.querySelectorAll('.fleet-cell') || [];
   cells.forEach((cell) => {
     const id = Number(cell.dataset.cell);
     const { row, col } = cellIdToCoord(id);
     const occupant = placement.grid[row][col];
     if (occupant) {
+      const ship = placement.ships.find((s) => s.id === occupant);
       cell.classList.add('occupied');
-      cell.textContent = occupant.replace('s', '');
+      cell.textContent = ship ? getShipShortLabel(ship) : 'X';
     } else {
       cell.classList.remove('occupied');
       cell.textContent = '';
@@ -1005,7 +1150,7 @@ function renderPlacementToDOM() {
 function handlePlaceShipAtCell(shipId, startCellId) {
   const ship = placement.ships.find((s) => s.id === shipId);
   if (!ship) return;
-  const coords = coordsForPlacement(startCellId, ship.size, placingOrientation, placingDir);
+  const coords = coordsForPlacement(startCellId, ship, placingOrientation, placingDir);
   if (!coords) {
     displayError('Posição inválida (fora da grade)');
     return;
@@ -1014,6 +1159,9 @@ function handlePlaceShipAtCell(shipId, startCellId) {
     displayError('Sobreposição detectada. Escolha outra posição.');
     return;
   }
+  ship.coords = coords;
+  ship.orientation = placingOrientation;
+  ship.dir = placingDir;
   placeShip(shipId, coords, placingOrientation);
 }
 
@@ -1024,18 +1172,37 @@ function clearPlacement() {
 }
 
 function randomizePlacement() {
-  // reuse createFleet for randomness then translate
-  const random = createFleet();
-  // clear
-  placement.ships.forEach((s) => (s.coords = []));
   placement.grid.forEach((row) => row.fill(null));
-  // map ships
-  random.ships.forEach((rship, idx) => {
-    const coords = rship.coords.map((c) => ({ row: c.row, col: c.col }));
-    const shipId = placement.ships[idx].id;
-    placement.ships[idx].coords = coords;
-    placement.ships[idx].orientation = coords.length > 1 && coords[0].row === coords[1].row ? 'horizontal' : 'vertical';
-    coords.forEach(({ row, col }) => (placement.grid[row][col] = shipId));
+  placement.ships.forEach((s) => {
+    s.coords = [];
+    s.orientation = 'horizontal';
+    s.dir = 1;
+  });
+
+  const shipsToPlace = [...placement.ships].sort((a, b) => {
+    return (getBlueprint(b.type)?.pattern.length || 0) - (getBlueprint(a.type)?.pattern.length || 0);
+  });
+
+  shipsToPlace.forEach((ship) => {
+    let placed = false;
+    let attempts = 0;
+    while (!placed && attempts < 400) {
+      attempts += 1;
+      const row = Math.floor(Math.random() * 10);
+      const col = Math.floor(Math.random() * 10);
+      const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const cellId = coordToCellId(row, col);
+      const coords = coordsForPlacement(cellId, ship, orientation, dir);
+      if (!coords || !canPlace(coords)) continue;
+      ship.coords = coords;
+      ship.orientation = orientation;
+      ship.dir = dir;
+      coords.forEach(({ row: r, col: c }) => {
+        placement.grid[r][c] = ship.id;
+      });
+      placed = true;
+    }
   });
   renderPlacementToDOM();
 }
@@ -1044,7 +1211,7 @@ function buildPlayerFleetFromPlacement() {
   const grid = Array.from({ length: 10 }, () => Array(10).fill(null));
   const ships = [];
   placement.ships.forEach((s) => {
-    const shipObj = { size: s.size, coords: s.coords.slice(), hits: new Set() };
+    const shipObj = { size: s.coords.length, type: s.type, coords: s.coords.slice(), hits: new Set() };
     ships.push(shipObj);
     s.coords.forEach(({ row, col }) => (grid[row][col] = shipObj));
   });
@@ -1083,7 +1250,10 @@ randomizeGridBtn?.addEventListener('click', () => {
 
 saveFleetBtn?.addEventListener('click', () => {
   // validate all ships placed
-  const allPlaced = placement.ships.every((s) => s.coords && s.coords.length === s.size);
+  const allPlaced = placement.ships.every((s) => {
+    const blueprint = getBlueprint(s.type);
+    return s.coords && blueprint && s.coords.length === blueprint.pattern.length;
+  });
   if (!allPlaced) {
     displayError('Você deve posicionar todos os navios antes de salvar.');
     return;
