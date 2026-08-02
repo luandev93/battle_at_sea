@@ -223,6 +223,20 @@ button:hover {
   transform: translateY(-1px);
 }
 
+.mute-button {
+  background: rgba(255, 95, 122, 0.18);
+  color: #ffb0c2;
+  border: 1px solid rgba(255, 95, 122, 0.35);
+  min-width: 160px;
+  font-weight: 700;
+}
+
+.mute-button.active {
+  background: rgba(75, 205, 255, 0.25);
+  color: #b9f1ff;
+  border-color: rgba(75, 205, 255, 0.55);
+}
+
 .primary-button {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #03101d;
@@ -253,7 +267,8 @@ button:hover {
   height: 100%;
   object-fit: cover;
   z-index: 0;
-  filter: saturate(0.35) brightness(0.55);
+  filter: saturate(0.2) brightness(0.5) contrast(0.95) grayscale(0.15);
+  opacity: 0.55;
 }
 
 .lobby-overlay {

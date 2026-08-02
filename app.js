@@ -50,6 +50,8 @@ const lobbyAudio = document.getElementById('lobby-audio');
 const toggleAudioButton = document.getElementById('toggle-audio-button');
 const logoutButton = document.getElementById('logout-button');
 const optionsButton = document.getElementById('options-button');
+let audioMuted = false;
+
 const closeOptionsButton = document.getElementById('close-options-button');
 const optionsPanel = document.getElementById('options-panel');
 const playerList = document.getElementById('player-list');
@@ -294,6 +296,8 @@ function botTakeTurn() {
     cell.dataset.shot = 'true';
   }
 
+  try { playEnemyShotSound(); } catch (e) {}
+
   const { hit, sunk } = applyShotToFleet(playerFleet, shotId);
   botAI.recordResult(shotId, hit, sunk);
 
@@ -349,6 +353,133 @@ function fillPlayerHistory(email = 'Jogador') {
 // --- Scoring and progression system ---
 let currentPlayerId = null; // email or identifier
 const patentIcon = document.getElementById('patent-icon');
+
+// WebAudio variables
+let audioCtx = null;
+let ambientGain = null;
+let ambientNodes = null;
+
+function initAudioContext() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function setAudioMuted(value) {
+  audioMuted = Boolean(value);
+  if (toggleAudioButton) {
+    toggleAudioButton.textContent = audioMuted ? 'Som: Mudo' : 'Som: Ligado';
+    toggleAudioButton.classList.toggle('active', !audioMuted);
+  }
+  if (audioMuted) {
+    stopAmbientSound();
+  } else {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    startAmbientSound();
+  }
+}
+
+function startAmbientSound() {
+  if (audioMuted) return;
+  initAudioContext();
+  if (ambientNodes) return;
+  ambientGain = audioCtx.createGain();
+  ambientGain.gain.value = 0.0;
+  ambientGain.connect(audioCtx.destination);
+
+  const osc1 = audioCtx.createOscillator();
+  osc1.type = 'sine';
+  osc1.frequency.value = 40;
+
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'sawtooth';
+  osc2.frequency.value = 65;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 500;
+
+  osc1.connect(filter);
+  osc2.connect(filter);
+  filter.connect(ambientGain);
+
+  osc1.start();
+  osc2.start();
+
+  ambientNodes = { osc1, osc2, filter };
+
+  // fade in
+  ambientGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  ambientGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+  ambientGain.gain.linearRampToValueAtTime(0.16, audioCtx.currentTime + 1.2);
+}
+
+function stopAmbientSound() {
+  if (!audioCtx || !ambientGain) return;
+  ambientGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  ambientGain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.8);
+  // stop oscillators after fade-out
+  setTimeout(() => {
+    if (!ambientNodes) return;
+    try {
+      ambientNodes.osc1.stop();
+      ambientNodes.osc2.stop();
+    } catch (e) {}
+    ambientNodes = null;
+  }, 900);
+}
+
+function playShotSound() {
+  if (audioMuted) return;
+  initAudioContext();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(900, now);
+  osc.frequency.exponentialRampToValueAtTime(120, now + 0.14);
+
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.5, now + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.35);
+
+  // short noise for impact
+  const bufferSize = Math.floor(audioCtx.sampleRate * 0.06);
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / bufferSize * 6);
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.6, now);
+  ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+  noise.connect(ng);
+  ng.connect(audioCtx.destination);
+  noise.start(now);
+  noise.stop(now + 0.18);
+}
+
+function playEnemyShotSound() {
+  if (audioMuted) return;
+  initAudioContext();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(400, now);
+  osc.frequency.exponentialRampToValueAtTime(90, now + 0.2);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.35, now + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 0.4);
+}
 
 function pointsNeeded(n) {
   return 33 * Math.pow(n, 1.5);
@@ -469,15 +600,13 @@ function awardPoints(amount, type = 'generic') {
 // --- end scoring ---
 
 function playLobbyAudio() {
-  if (!lobbyAudio) {
-    return;
-  }
-
-  lobbyAudio.volume = 0.35;
-  lobbyAudio.muted = false;
-  lobbyAudio.play().catch(() => {
-    /* autoplay pode falhar no navegador */
-  });
+  if (audioMuted) return;
+  try {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  } catch (e) {}
+  startAmbientSound();
 }
 
 function handleForfeit() {
@@ -496,27 +625,15 @@ function handleForfeit() {
 }
 
 function pauseLobbyAudio() {
-  if (!lobbyAudio) {
-    return;
-  }
-
-  lobbyAudio.pause();
+  stopAmbientSound();
 }
 
 function toggleLobbyAudio() {
-  if (!lobbyAudio || !toggleAudioButton) {
-    return;
+  if (!audioCtx) initAudioContext();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
   }
-
-  if (lobbyAudio.muted || lobbyAudio.paused) {
-    lobbyAudio.muted = false;
-    lobbyAudio.play().catch(() => {});
-    toggleAudioButton.textContent = 'Áudio On';
-  } else {
-    lobbyAudio.muted = true;
-    lobbyAudio.pause();
-    toggleAudioButton.textContent = 'Áudio Off';
-  }
+  setAudioMuted(!audioMuted);
 }
 
 function openOptions() {
@@ -770,11 +887,13 @@ function sendFireCommand(cell) {
   startReload();
 
   if (isSoloMode) {
+    playShotSound();
     processPlayerShot(cell);
     return;
   }
 
   const cellId = cell.dataset.cell;
+  playShotSound();
   socket.emit('fire_cannon', { cell: cellId });
 }
 
@@ -988,25 +1107,6 @@ closeFleetBtn?.addEventListener('click', () => closeFleetModal());
 
 fleetConfigButton?.addEventListener('click', () => openFleetModal());
 
-// Ensure solo mode requires saved fleet
-function startSoloMode() {
-  if (!fleetSaved) {
-    alert('Salve sua frota antes de iniciar uma partida solo.');
-    return;
-  }
-  isSoloMode = true;
-  botAI = new BotAI(10);
-  soloEnemyFleet = createFleet();
-  // playerFleet already set from saved placement
-  isPlayerTurn = true;
-  canShoot = true;
-  clearBoardShots();
-  showBattleScreen();
-  setBattleStatus('Modo solo iniciado. Sua vez.');
-}
-
-window.startSoloMode = startSoloMode;
-
 // --- Socket flow for PvP hits validation ---
 socket.on('opponent_fire', ({ cell, shooterIndex }) => {
   // opponent fired at us; compute hit against our playerFleet
@@ -1026,6 +1126,8 @@ socket.on('opponent_fire', ({ cell, shooterIndex }) => {
     cellEl.dataset.shot = 'true';
     cellEl.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
   }
+  // play enemy shot sound
+  try { playEnemyShotSound(); } catch (e) {}
   socket.emit('fire_response', { cell, shooterIndex, hit, sunk, defeated });
 });
 
