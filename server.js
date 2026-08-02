@@ -65,14 +65,44 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // forward the fire to the opponent to validate hit/sunk locally
+    socket.to(roomId).emit('opponent_fire', { cell, shooterIndex: playerIndex });
+  });
+
+  socket.on('fire_response', ({ cell, shooterIndex, hit, sunk, defeated }) => {
+    const { roomId, playerIndex } = socket.data;
+    if (!roomId || !rooms.has(roomId)) return;
+    const room = rooms.get(roomId);
+    // advance turn
     const nextTurn = room.currentTurn === 1 ? 2 : 1;
     room.currentTurn = nextTurn;
 
-    io.in(roomId).emit('shot_result', {
-      cell,
-      shooterIndex: playerIndex,
-      nextTurn,
-    });
+    // determine winner if defeated
+    let winner = null;
+    if (defeated) {
+      winner = shooterIndex;
+      // close room
+      io.in(roomId).emit('shot_result', { cell, shooterIndex, nextTurn, hit, sunk, defeated: true, winner });
+      rooms.delete(roomId);
+      return;
+    }
+
+    io.in(roomId).emit('shot_result', { cell, shooterIndex, nextTurn, hit, sunk, defeated: false });
+  });
+
+  socket.on('decline_match', () => {
+    const { roomId } = socket.data;
+    if (!roomId || !rooms.has(roomId)) return;
+    const room = rooms.get(roomId);
+    // notify both
+    io.in(roomId).emit('match_declined');
+    // requeue remaining sockets: pick first other socket as waiting
+    const other = room.players.find((id) => id !== socket.id);
+    rooms.delete(roomId);
+    if (other && io.sockets.sockets.get(other)) {
+      waitingSocket = io.sockets.sockets.get(other);
+      waitingSocket.emit('waiting_for_opponent');
+    }
   });
 
   socket.on('player_info', ({ name }) => {

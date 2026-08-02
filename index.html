@@ -7,6 +7,7 @@
       "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
       "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
       "firebase/analytics": "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js"
+      ,"firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
     }
   }
 </script>
@@ -66,6 +67,7 @@
             <div class="topbar-left">
               <span class="topbar-label">Capitão:</span>
               <span class="topbar-user" id="player-name">Visitante</span>
+              <span id="patent-icon" class="patent-icon" aria-hidden="true"></span>
             </div>
             <div class="topbar-actions">
               <button type="button" id="toggle-audio-button" class="secondary-button">Áudio On</button>
@@ -140,6 +142,32 @@
                   <li>Preferências de notificação</li>
                   <li>Configurações de exibição</li>
                 </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fleet configuration modal -->
+          <div id="fleet-modal" class="fleet-modal hidden">
+            <div class="fleet-modal-card">
+              <div class="fleet-modal-header">
+                <h3>Configurar Frota</h3>
+                <div class="fleet-controls">
+                  <button type="button" id="rotate-ship" class="secondary-button">Rotacionar</button>
+                  <button type="button" id="flip-ship" class="secondary-button">Espelhar</button>
+                  <button type="button" id="clear-grid" class="secondary-button">Limpar Grade</button>
+                  <button type="button" id="randomize-grid" class="secondary-button">Preencher Aleatoriamente</button>
+                  <button type="button" id="save-fleet" class="primary-button">Salvar Frota</button>
+                  <button type="button" id="close-fleet" class="text-button">Fechar</button>
+                </div>
+              </div>
+              <div class="fleet-modal-body">
+                <div class="fleet-inventory" id="fleet-inventory"></div>
+                <div class="fleet-grid" id="fleet-grid" aria-label="Configuração da frota">
+                  <!-- 10x10 cells inserted by JS -->
+                </div>
+              </div>
+              <div class="fleet-modal-footer">
+                <div id="fleet-modal-note" class="card-note">Arraste os navios para a grade. É necessário salvar antes de iniciar uma partida.</div>
               </div>
             </div>
           </div>

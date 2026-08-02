@@ -10,6 +10,8 @@ import {
   signOut,
 } from 'firebase/auth';
 import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm.min.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from './firebase-config.js';
 
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
@@ -238,10 +240,14 @@ function clearBoardShots() {
 }
 
 function startSoloMode() {
+  if (!fleetSaved) {
+    alert('Salve sua frota antes de iniciar uma partida solo.');
+    return;
+  }
   isSoloMode = true;
   botAI = new BotAI(10);
   soloEnemyFleet = createFleet();
-  playerFleet = createFleet();
+  // playerFleet set from saved placement
   isPlayerTurn = true;
   canShoot = true;
   clearBoardShots();
@@ -265,6 +271,7 @@ function processPlayerShot(cell) {
 
   if (hit && sunk && isFleetSunk(soloEnemyFleet)) {
     setBattleStatus('Você derrotou o bot!');
+    awardPoints(1, 'solo_win');
     return;
   }
 
@@ -329,7 +336,6 @@ function fillPlayerHistory(email = 'Jogador') {
   if (!historyList) {
     return;
   }
-
   const history = [
     `Jogador: ${email}`,
     `Última vitória: 3 dias atrás`,
@@ -339,6 +345,128 @@ function fillPlayerHistory(email = 'Jogador') {
   ];
   historyList.innerHTML = history.map((item) => `<li>${item}</li>`).join('');
 }
+
+// --- Scoring and progression system ---
+let currentPlayerId = null; // email or identifier
+const patentIcon = document.getElementById('patent-icon');
+
+function pointsNeeded(n) {
+  return 33 * Math.pow(n, 1.5);
+}
+
+function levelForPoints(points) {
+  let level = 0;
+  for (let n = 1; n < 1000; n += 1) {
+    if (points >= pointsNeeded(n)) {
+      level = n;
+    } else {
+      break;
+    }
+  }
+  return level; // level 0 means below first threshold
+}
+
+function loadStats(id) {
+  if (!id) return { points: 0, winsPvP: 0, winsSolo: 0 };
+  try {
+    const raw = localStorage.getItem(`bas:stats:${id}`);
+    return raw ? JSON.parse(raw) : { points: 0, winsPvP: 0, winsSolo: 0 };
+  } catch (e) {
+    return { points: 0, winsPvP: 0, winsSolo: 0 };
+  }
+}
+
+function saveStats(id, stats) {
+  if (!id) return;
+  localStorage.setItem(`bas:stats:${id}`, JSON.stringify(stats));
+}
+
+async function saveStatsToFirestore(id, stats) {
+  if (!id) return;
+  try {
+    await setDoc(doc(db, 'users', id), { stats: stats }, { merge: true });
+  } catch (e) {
+    console.warn('Não foi possível salvar estatísticas no Firestore', e);
+  }
+}
+
+async function loadStatsFromFirestore(id) {
+  if (!id) return null;
+  try {
+    const snap = await getDoc(doc(db, 'users', id));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return data.stats || null;
+  } catch (e) {
+    console.warn('Erro ao carregar estatísticas', e);
+    return null;
+  }
+}
+
+async function loadFleetFromFirestore(id) {
+  if (!id) return null;
+  try {
+    const snap = await getDoc(doc(db, 'users', id));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    if (data.fleet && Array.isArray(data.fleet)) {
+      // map into placement structure
+      initPlacement();
+      data.fleet.forEach((s, idx) => {
+        if (placement.ships[idx]) {
+          placement.ships[idx].coords = s.coords || [];
+          placement.ships[idx].orientation = s.orientation || placement.ships[idx].orientation;
+          placement.ships[idx].size = s.size || placement.ships[idx].size;
+          placement.ships[idx].id = placement.ships[idx].id;
+          placement.ships[idx].coords.forEach(({ row, col }) => (placement.grid[row][col] = placement.ships[idx].id));
+        }
+      });
+      renderPlacementToDOM();
+      // mark saved and build playerFleet
+      fleetSaved = true;
+      playerFleet = buildPlayerFleetFromPlacement();
+      if (fleetConfigStatus) fleetConfigStatus.textContent = 'Frota carregada.';
+      return placement;
+    }
+    return null;
+  } catch (e) {
+    console.warn('Erro ao carregar frota', e);
+    return null;
+  }
+}
+
+function renderPatentIcon(level) {
+  if (!patentIcon) return;
+  const icons = ['🔰', '⚓', '🛳️', '🚢', '🦅', '🏅', '🏴‍☠️'];
+  const idx = Math.min(level, icons.length - 1);
+  patentIcon.textContent = icons[idx] || icons[0];
+  patentIcon.title = `Patente: Nível ${level} • Próximo: ${Math.ceil(pointsNeeded(level + 1))} pts`;
+}
+
+function updateStatsUI(id) {
+  const stats = loadStats(id);
+  const level = levelForPoints(stats.points);
+  renderPatentIcon(level);
+}
+
+function awardPoints(amount, type = 'generic') {
+  if (!currentPlayerId) return;
+  const stats = loadStats(currentPlayerId);
+  const prevLevel = levelForPoints(stats.points);
+  stats.points = (stats.points || 0) + amount;
+  if (type === 'pvp_win') stats.winsPvP = (stats.winsPvP || 0) + 1;
+  if (type === 'solo_win') stats.winsSolo = (stats.winsSolo || 0) + 1;
+  saveStats(currentPlayerId, stats);
+  // persist to Firestore as well
+  saveStatsToFirestore(currentPlayerId, stats).catch(() => {});
+  const newLevel = levelForPoints(stats.points);
+  updateStatsUI(currentPlayerId);
+  if (newLevel > prevLevel) {
+    setBattleStatus(`Subiu de patente! Agora Nível ${newLevel}`);
+  }
+}
+
+// --- end scoring ---
 
 function playLobbyAudio() {
   if (!lobbyAudio) {
@@ -480,6 +608,19 @@ async function handleSignIn() {
     const playerLabel = user.email || 'Capitão';
     playerName.textContent = playerLabel;
     fillPlayerHistory(playerLabel);
+    currentPlayerId = user.uid || user.email || playerLabel;
+    updateStatsUI(currentPlayerId);
+    // load saved fleet if present in Firestore
+    loadFleetFromFirestore(currentPlayerId).catch(() => {});
+    // load stats from Firestore and merge
+    loadStatsFromFirestore(currentPlayerId)
+      .then((remoteStats) => {
+        if (remoteStats) {
+          saveStats(currentPlayerId, remoteStats);
+          updateStatsUI(currentPlayerId);
+        }
+      })
+      .catch(() => {});
     showLobbyScreen();
     playLobbyAudio();
     socket.emit('player_info', { name: playerLabel });
@@ -617,6 +758,14 @@ function sendFireCommand(cell) {
     return;
   }
 
+  // prevent duplicate shots on same coordinate
+  if (cell.dataset.shot) {
+    return;
+  }
+
+  // mark shot locally to block duplicate attempts while resolving
+  cell.dataset.shot = 'true';
+
   canShoot = false;
   startReload();
 
@@ -628,6 +777,257 @@ function sendFireCommand(cell) {
   const cellId = cell.dataset.cell;
   socket.emit('fire_cannon', { cell: cellId });
 }
+
+// --- Fleet configuration modal and placement logic ---
+const fleetModal = document.getElementById('fleet-modal');
+const fleetInventory = document.getElementById('fleet-inventory');
+const fleetGridEl = document.getElementById('fleet-grid');
+const rotateShipBtn = document.getElementById('rotate-ship');
+const flipShipBtn = document.getElementById('flip-ship');
+const clearGridBtn = document.getElementById('clear-grid');
+const randomizeGridBtn = document.getElementById('randomize-grid');
+const saveFleetBtn = document.getElementById('save-fleet');
+const closeFleetBtn = document.getElementById('close-fleet');
+
+let fleetSaved = false;
+let placingOrientation = 'horizontal'; // or 'vertical'
+let placingDir = 1; // 1 forward, -1 reverse
+const fleetSizesLocal = [5, 4, 3, 3, 2];
+let placement = null; // { grid: 10x10 null or shipId, ships: [{id,size,coords,orientation}] }
+
+function initPlacement() {
+  const grid = Array.from({ length: 10 }, () => Array(10).fill(null));
+  const ships = fleetSizesLocal.map((size, i) => ({ id: `s${i}`, size, coords: [], orientation: 'horizontal' }));
+  placement = { grid, ships };
+}
+
+function renderFleetGrid() {
+  if (!fleetGridEl) return;
+  fleetGridEl.innerHTML = '';
+  for (let i = 1; i <= 100; i += 1) {
+    const cell = document.createElement('div');
+    cell.className = 'fleet-cell';
+    cell.dataset.cell = String(i);
+    cell.addEventListener('dragover', (e) => e.preventDefault());
+    cell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const shipId = e.dataTransfer.getData('text/plain');
+      handlePlaceShipAtCell(shipId, cell.dataset.cell);
+    });
+    fleetGridEl.appendChild(cell);
+  }
+}
+
+function renderInventory() {
+  if (!fleetInventory) return;
+  fleetInventory.innerHTML = '';
+  placement.ships.forEach((ship) => {
+    const el = document.createElement('div');
+    el.className = 'fleet-ship';
+    el.draggable = true;
+    el.dataset.shipId = ship.id;
+    el.textContent = `Navio (${ship.size})`;
+    el.addEventListener('dragstart', (ev) => {
+      ev.dataTransfer.setData('text/plain', ship.id);
+    });
+    fleetInventory.appendChild(el);
+  });
+}
+
+function coordsForPlacement(startCellId, size, orientation, dir) {
+  const { row, col } = cellIdToCoord(startCellId);
+  const coords = [];
+  for (let i = 0; i < size; i += 1) {
+    const r = orientation === 'horizontal' ? row : row + i * dir;
+    const c = orientation === 'horizontal' ? col + i * dir : col;
+    if (r < 0 || r >= 10 || c < 0 || c >= 10) return null;
+    coords.push({ row: r, col: c });
+  }
+  return coords;
+}
+
+function canPlace(coords) {
+  return coords.every(({ row, col }) => placement.grid[row][col] === null);
+}
+
+function placeShip(shipId, coords, orientation) {
+  const ship = placement.ships.find((s) => s.id === shipId);
+  if (!ship) return false;
+  // clear previous
+  ship.coords.forEach(({ row, col }) => {
+    placement.grid[row][col] = null;
+  });
+  ship.coords = coords;
+  ship.orientation = orientation;
+  coords.forEach(({ row, col }) => {
+    placement.grid[row][col] = shipId;
+  });
+  renderPlacementToDOM();
+  return true;
+}
+
+function renderPlacementToDOM() {
+  // update fleet grid cells
+  const cells = fleetGridEl?.querySelectorAll('.fleet-cell') || [];
+  cells.forEach((cell) => {
+    const id = Number(cell.dataset.cell);
+    const { row, col } = cellIdToCoord(id);
+    const occupant = placement.grid[row][col];
+    if (occupant) {
+      cell.classList.add('occupied');
+      cell.textContent = occupant.replace('s', '');
+    } else {
+      cell.classList.remove('occupied');
+      cell.textContent = '';
+    }
+  });
+}
+
+function handlePlaceShipAtCell(shipId, startCellId) {
+  const ship = placement.ships.find((s) => s.id === shipId);
+  if (!ship) return;
+  const coords = coordsForPlacement(startCellId, ship.size, placingOrientation, placingDir);
+  if (!coords) {
+    displayError('Posição inválida (fora da grade)');
+    return;
+  }
+  if (!canPlace(coords)) {
+    displayError('Sobreposição detectada. Escolha outra posição.');
+    return;
+  }
+  placeShip(shipId, coords, placingOrientation);
+}
+
+function clearPlacement() {
+  placement.ships.forEach((s) => (s.coords = []));
+  placement.grid.forEach((row) => row.fill(null));
+  renderPlacementToDOM();
+}
+
+function randomizePlacement() {
+  // reuse createFleet for randomness then translate
+  const random = createFleet();
+  // clear
+  placement.ships.forEach((s) => (s.coords = []));
+  placement.grid.forEach((row) => row.fill(null));
+  // map ships
+  random.ships.forEach((rship, idx) => {
+    const coords = rship.coords.map((c) => ({ row: c.row, col: c.col }));
+    const shipId = placement.ships[idx].id;
+    placement.ships[idx].coords = coords;
+    placement.ships[idx].orientation = coords.length > 1 && coords[0].row === coords[1].row ? 'horizontal' : 'vertical';
+    coords.forEach(({ row, col }) => (placement.grid[row][col] = shipId));
+  });
+  renderPlacementToDOM();
+}
+
+function buildPlayerFleetFromPlacement() {
+  const grid = Array.from({ length: 10 }, () => Array(10).fill(null));
+  const ships = [];
+  placement.ships.forEach((s) => {
+    const shipObj = { size: s.size, coords: s.coords.slice(), hits: new Set() };
+    ships.push(shipObj);
+    s.coords.forEach(({ row, col }) => (grid[row][col] = shipObj));
+  });
+  return { grid, ships };
+}
+
+function openFleetModal() {
+  if (!fleetModal) return;
+  fleetModal.classList.remove('hidden');
+  initPlacement();
+  renderFleetGrid();
+  renderInventory();
+  renderPlacementToDOM();
+}
+
+function closeFleetModal() {
+  if (!fleetModal) return;
+  fleetModal.classList.add('hidden');
+}
+
+rotateShipBtn?.addEventListener('click', () => {
+  placingOrientation = placingOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+});
+
+flipShipBtn?.addEventListener('click', () => {
+  placingDir = placingDir === 1 ? -1 : 1;
+});
+
+clearGridBtn?.addEventListener('click', () => {
+  clearPlacement();
+});
+
+randomizeGridBtn?.addEventListener('click', () => {
+  randomizePlacement();
+});
+
+saveFleetBtn?.addEventListener('click', () => {
+  // validate all ships placed
+  const allPlaced = placement.ships.every((s) => s.coords && s.coords.length === s.size);
+  if (!allPlaced) {
+    displayError('Você deve posicionar todos os navios antes de salvar.');
+    return;
+  }
+  playerFleet = buildPlayerFleetFromPlacement();
+  fleetSaved = true;
+  if (fleetConfigStatus) fleetConfigStatus.textContent = 'Frota salva.';
+  // persist to Firestore if possible
+  if (currentPlayerId) {
+    setDoc(doc(db, 'users', currentPlayerId), { fleet: placement.ships }, { merge: true })
+      .catch(() => {
+        displayError('Não foi possível salvar a frota remotamente. Salvando localmente.');
+      })
+      .finally(() => closeFleetModal());
+  } else {
+    closeFleetModal();
+  }
+});
+
+closeFleetBtn?.addEventListener('click', () => closeFleetModal());
+
+fleetConfigButton?.addEventListener('click', () => openFleetModal());
+
+// Ensure solo mode requires saved fleet
+function startSoloMode() {
+  if (!fleetSaved) {
+    alert('Salve sua frota antes de iniciar uma partida solo.');
+    return;
+  }
+  isSoloMode = true;
+  botAI = new BotAI(10);
+  soloEnemyFleet = createFleet();
+  // playerFleet already set from saved placement
+  isPlayerTurn = true;
+  canShoot = true;
+  clearBoardShots();
+  showBattleScreen();
+  setBattleStatus('Modo solo iniciado. Sua vez.');
+}
+
+window.startSoloMode = startSoloMode;
+
+// --- Socket flow for PvP hits validation ---
+socket.on('opponent_fire', ({ cell, shooterIndex }) => {
+  // opponent fired at us; compute hit against our playerFleet
+  const cellEl = board?.querySelector(`[data-cell="${cell}"]`);
+  let hit = false;
+  let sunk = false;
+  let defeated = false;
+  if (playerFleet) {
+    const { hit: h, sunk: s } = applyShotToFleet(playerFleet, cell);
+    hit = h; sunk = s;
+    if (s && isFleetSunk(playerFleet)) {
+      defeated = true;
+    }
+  }
+  // mark our board for the opponent's shot
+  if (cellEl) {
+    cellEl.dataset.shot = 'true';
+    cellEl.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
+  }
+  socket.emit('fire_response', { cell, shooterIndex, hit, sunk, defeated });
+});
 
 function handleBoardPointerMove(event) {
   updateReticlePosition(event.clientX, event.clientY);
@@ -682,15 +1082,36 @@ function handleSpacebar(event) {
 socket.on('match_found', ({ playerIndex: index, isPlayerTurn: turn }) => {
   playerIndex = index;
   isPlayerTurn = turn;
+  if (!fleetSaved) {
+    // decline the match if fleet not saved
+    socket.emit('decline_match');
+    setBattleStatus('Partida recusada: salve sua frota antes de batalhar.');
+    return;
+  }
   showBattleScreen();
   setBattleStatus(turn ? 'Partida online iniciada. Sua vez.' : 'Partida online iniciada. Aguarde o turno do adversário.');
 });
 
-socket.on('shot_result', ({ cell, shooterIndex, nextTurn }) => {
+socket.on('shot_result', (payload) => {
+  const { cell, shooterIndex, nextTurn, hit, sunk, defeated, winner } = payload;
   const targetCell = board?.querySelector(`[data-cell="${cell}"]`);
+  const isShooter = playerIndex === shooterIndex;
   if (targetCell) {
-    const isShooter = playerIndex === shooterIndex;
-    highlightCell(targetCell, isShooter ? 'board-cell-shot' : 'board-cell-fleet-hit');
+    if (typeof hit !== 'undefined') {
+      if (isShooter) {
+        targetCell.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
+      } else {
+        targetCell.classList.add(hit ? 'board-cell-fleet-hit' : 'board-cell-shot');
+      }
+      if (sunk) {
+        setBattleStatus(isShooter ? 'Você afundou um navio!' : 'Seu navio foi afundado!');
+      }
+      if (defeated) {
+        setBattleStatus(winner === playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
+      }
+    } else {
+      highlightCell(targetCell, isShooter ? 'board-cell-shot' : 'board-cell-fleet-hit');
+    }
   }
   isPlayerTurn = playerIndex === nextTurn;
 });
@@ -698,6 +1119,8 @@ socket.on('shot_result', ({ cell, shooterIndex, nextTurn }) => {
 socket.on('battle_forfeit', ({ winner, loser }) => {
   if (playerIndex === winner) {
     setBattleStatus('Vitória por W.O.! Seu oponente desistiu.');
+    // award PvP victory points (server-triggered W.O.)
+    awardPoints(5, 'pvp_win');
   } else {
     setBattleStatus('Sua equipe perdeu por W.O..');
   }
@@ -751,9 +1174,7 @@ optionsButton?.addEventListener('click', openOptions);
 closeOptionsButton?.addEventListener('click', closeOptions);
 forfeitButton?.addEventListener('click', handleForfeit);
 fleetConfigButton?.addEventListener('click', () => {
-  if (fleetConfigStatus) {
-    fleetConfigStatus.textContent = 'Frota marcada! Ajuste posições antes do combate.';
-  }
+  openFleetModal();
 });
 viewHistoryButton?.addEventListener('click', () => {
   fillPlayerHistory();
