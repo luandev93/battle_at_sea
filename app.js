@@ -8,7 +8,7 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
-} from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+} from 'firebase/auth';
 import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm.min.js';
 
 const emailInput = document.getElementById('email');
