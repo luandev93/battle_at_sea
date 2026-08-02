@@ -1,0 +1,26 @@
+{
+  "name": "battle_at_sea",
+  "version": "1.0.0",
+  "description": "Projeto de desenvolvimento de jogo estilo Batalha Naval com automação e IA.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luandev93/battle_at_sea.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/luandev93/battle_at_sea/issues"
+  },
+  "homepage": "https://github.com/luandev93/battle_at_sea#readme",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}
