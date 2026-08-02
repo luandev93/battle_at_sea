@@ -18,12 +18,24 @@
             </div>
           </div>
 
-          <form id="login-form" class="login-form">
+          <form id="login-form" class="login-form" novalidate>
             <label for="email">Email</label>
-            <input type="email" id="email" name="email" placeholder="seu.email@exemplo.com" required />
+            <input type="email" id="email" name="email" placeholder="seu.email@exemplo.com" autocomplete="username" required />
 
             <label for="password">Senha</label>
-            <input type="password" id="password" name="password" placeholder="••••••••" required />
+            <div class="password-row">
+              <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+              <button type="button" id="toggle-password" class="toggle-password" aria-label="Mostrar senha">Mostrar</button>
+            </div>
+            <div id="caps-lock-warning" class="form-note caps-warning" hidden>Caps Lock ativado</div>
+
+            <div class="form-footer">
+              <label class="checkbox-field">
+                <input type="checkbox" id="remember-me" />
+                Lembrar neste dispositivo
+              </label>
+              <button type="button" id="forgot-password-button" class="text-button">Esqueci minha senha</button>
+            </div>
 
             <div id="error-message" class="error-message" aria-live="polite"></div>
 
@@ -37,8 +49,11 @@
 
       <div class="lobby-screen hidden" id="lobby-screen">
         <div class="lobby-panel">
-          <h2>Buscando oponentes online...</h2>
-          <p>Prepare-se para uma partida naval estratégica.</p>
+          <h2>Escolha seu modo de batalha</h2>
+          <p>Jogue contra um bot inteligente ou encontre um oponente online.</p>
+          <div class="button-row">
+            <button type="button" id="start-solo-button" class="primary-button">Jogar Solo</button>
+          </div>
         </div>
       </div>
 
@@ -49,6 +64,7 @@
               <span class="ammo-label">Munição</span>
               <span class="ammo-value">12</span>
             </div>
+            <div id="battle-status" class="battle-status" aria-live="polite">Aguardando inicío...</div>
           </div>
 
           <div class="board-frame">
