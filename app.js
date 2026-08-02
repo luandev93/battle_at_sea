@@ -43,6 +43,19 @@ let playerFleet = null;
 const shipSizes = [5, 4, 3, 3, 2];
 const startSoloButton = document.getElementById('start-solo-button');
 const battleStatus = document.getElementById('battle-status');
+const forfeitButton = document.getElementById('forfeit-button');
+const lobbyAudio = document.getElementById('lobby-audio');
+const toggleAudioButton = document.getElementById('toggle-audio-button');
+const logoutButton = document.getElementById('logout-button');
+const optionsButton = document.getElementById('options-button');
+const closeOptionsButton = document.getElementById('close-options-button');
+const optionsPanel = document.getElementById('options-panel');
+const playerList = document.getElementById('player-list');
+const historyList = document.getElementById('history-list');
+const playerName = document.getElementById('player-name');
+const fleetConfigButton = document.getElementById('fleet-config-button');
+const fleetConfigStatus = document.getElementById('fleet-config-status');
+const viewHistoryButton = document.getElementById('view-history-button');
 
 function coordToCellId(row, col) {
   return row * 10 + col + 1;
@@ -302,6 +315,102 @@ function clearError() {
   }
 }
 
+function fillOnlinePlayers(players = []) {
+  if (!playerList) {
+    return;
+  }
+
+  playerList.innerHTML = players.length
+    ? players.map((player) => `<li>${player}</li>`).join('')
+    : '<li>Aguardando combatentes...</li>';
+}
+
+function fillPlayerHistory(email = 'Jogador') {
+  if (!historyList) {
+    return;
+  }
+
+  const history = [
+    `Jogador: ${email}`,
+    `Última vitória: 3 dias atrás`,
+    `Derrotas: 7`,
+    `Vitórias: 12`,
+    `Taxa de vitória: 63%`,
+  ];
+  historyList.innerHTML = history.map((item) => `<li>${item}</li>`).join('');
+}
+
+function playLobbyAudio() {
+  if (!lobbyAudio) {
+    return;
+  }
+
+  lobbyAudio.volume = 0.35;
+  lobbyAudio.muted = false;
+  lobbyAudio.play().catch(() => {
+    /* autoplay pode falhar no navegador */
+  });
+}
+
+function handleForfeit() {
+  const confirmed = window.confirm('Deseja desistir desta partida? Isso concederá vitória por W.O. ao oponente.');
+  if (!confirmed) {
+    return;
+  }
+
+  if (isSoloMode) {
+    setBattleStatus('Você desistiu. Vitória por W.O. do bot.');
+    return;
+  }
+
+  socket.emit('forfeit_battle');
+  setBattleStatus('Você desistiu. Vitória por W.O. concedida ao adversário.');
+}
+
+function pauseLobbyAudio() {
+  if (!lobbyAudio) {
+    return;
+  }
+
+  lobbyAudio.pause();
+}
+
+function toggleLobbyAudio() {
+  if (!lobbyAudio || !toggleAudioButton) {
+    return;
+  }
+
+  if (lobbyAudio.muted || lobbyAudio.paused) {
+    lobbyAudio.muted = false;
+    lobbyAudio.play().catch(() => {});
+    toggleAudioButton.textContent = 'Áudio On';
+  } else {
+    lobbyAudio.muted = true;
+    lobbyAudio.pause();
+    toggleAudioButton.textContent = 'Áudio Off';
+  }
+}
+
+function openOptions() {
+  optionsPanel?.classList.remove('hidden');
+}
+
+function closeOptions() {
+  optionsPanel?.classList.add('hidden');
+}
+
+function logout() {
+  signOut(auth).catch(() => {});
+  setBattleStatus('Você saiu. Volte sempre.');
+  loginScreen.classList.remove('hidden');
+  loginScreen.classList.remove('visible');
+  lobbyScreen.classList.add('hidden');
+  lobbyScreen.classList.remove('visible');
+  battleScreen.classList.add('hidden');
+  battleScreen.classList.remove('visible');
+  pauseLobbyAudio();
+}
+
 function getPersistenceMode() {
   return rememberMeCheckbox?.checked ? browserLocalPersistence : browserSessionPersistence;
 }
@@ -330,6 +439,8 @@ function showLobbyScreen() {
   loginScreen.classList.add('hidden');
   lobbyScreen.classList.remove('hidden');
   lobbyScreen.classList.add('visible');
+  battleScreen.classList.add('hidden');
+  battleScreen.classList.remove('visible');
 }
 
 function showBattleScreen() {
@@ -337,6 +448,7 @@ function showBattleScreen() {
   lobbyScreen.classList.remove('visible');
   battleScreen.classList.remove('hidden');
   battleScreen.classList.add('visible');
+  pauseLobbyAudio();
 }
 
 function getCredentials() {
@@ -365,7 +477,12 @@ async function handleSignIn() {
       return;
     }
 
+    const playerLabel = user.email || 'Capitão';
+    playerName.textContent = playerLabel;
+    fillPlayerHistory(playerLabel);
     showLobbyScreen();
+    playLobbyAudio();
+    socket.emit('player_info', { name: playerLabel });
   } catch (error) {
     displayError(error.message || 'Falha ao entrar. Verifique suas credenciais.');
   }
@@ -578,8 +695,21 @@ socket.on('shot_result', ({ cell, shooterIndex, nextTurn }) => {
   isPlayerTurn = playerIndex === nextTurn;
 });
 
+socket.on('battle_forfeit', ({ winner, loser }) => {
+  if (playerIndex === winner) {
+    setBattleStatus('Vitória por W.O.! Seu oponente desistiu.');
+  } else {
+    setBattleStatus('Sua equipe perdeu por W.O..');
+  }
+  isPlayerTurn = false;
+});
+
 socket.on('waiting_for_opponent', () => {
   setBattleStatus('Aguardando oponente online...');
+});
+
+socket.on('online_players', (players) => {
+  fillOnlinePlayers(players);
 });
 
 socket.on('opponent_left', () => {
@@ -615,6 +745,19 @@ passwordInput.addEventListener('blur', () => {
 });
 
 startSoloButton?.addEventListener('click', startSoloMode);
+logoutButton?.addEventListener('click', logout);
+toggleAudioButton?.addEventListener('click', toggleLobbyAudio);
+optionsButton?.addEventListener('click', openOptions);
+closeOptionsButton?.addEventListener('click', closeOptions);
+forfeitButton?.addEventListener('click', handleForfeit);
+fleetConfigButton?.addEventListener('click', () => {
+  if (fleetConfigStatus) {
+    fleetConfigStatus.textContent = 'Frota marcada! Ajuste posições antes do combate.';
+  }
+});
+viewHistoryButton?.addEventListener('click', () => {
+  fillPlayerHistory();
+});
 
 if (board) {
   board.addEventListener('mousemove', handleBoardPointerMove);

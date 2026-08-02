@@ -38,8 +38,12 @@ function createMatchRoom(firstSocket, secondSocket) {
   console.log(`Match found in room ${roomId}`);
 }
 
+const connectedPlayers = new Map();
+
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
+  connectedPlayers.set(socket.id, { id: socket.id, name: 'Jogador' });
+  io.emit('online_players', Array.from(connectedPlayers.values()).map((player) => player.name));
 
   if (waitingSocket && waitingSocket.connected) {
     createMatchRoom(waitingSocket, socket);
@@ -71,8 +75,29 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('player_info', ({ name }) => {
+    const playerName = name || 'Jogador';
+    connectedPlayers.set(socket.id, { id: socket.id, name: playerName });
+    io.emit('online_players', Array.from(connectedPlayers.values()).map((player) => player.name));
+  });
+
+  socket.on('forfeit_battle', () => {
+    const { roomId, playerIndex } = socket.data;
+    if (!roomId || !rooms.has(roomId)) {
+      return;
+    }
+
+    const room = rooms.get(roomId);
+    const loser = playerIndex;
+    const winner = loser === 1 ? 2 : 1;
+    io.in(roomId).emit('battle_forfeit', { winner, loser });
+    rooms.delete(roomId);
+  });
+
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}`);
+    connectedPlayers.delete(socket.id);
+    io.emit('online_players', Array.from(connectedPlayers.values()).map((player) => player.name));
 
     if (waitingSocket === socket) {
       waitingSocket = null;

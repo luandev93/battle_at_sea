@@ -17,7 +17,7 @@
   </head>
   <body>
     <div class="page-shell">
-      <div class="login-screen" id="login-screen">
+      <div class="login-screen screen" id="login-screen">
         <div class="login-panel">
           <div class="brand">
             <div class="brand-icon">⚓</div>
@@ -56,17 +56,97 @@
         </div>
       </div>
 
-      <div class="lobby-screen hidden" id="lobby-screen">
-        <div class="lobby-panel">
-          <h2>Escolha seu modo de batalha</h2>
-          <p>Jogue contra um bot inteligente ou encontre um oponente online.</p>
-          <div class="button-row">
-            <button type="button" id="start-solo-button" class="primary-button">Jogar Solo</button>
+      <div class="lobby-screen screen hidden" id="lobby-screen">
+        <video id="lobby-video" class="lobby-video" autoplay loop muted playsinline>
+          <source src="https://cdn.pixabay.com/v/video/2021/10/17/20/46/ocean-6722798_1280.mp4" type="video/mp4" />
+        </video>
+        <audio id="lobby-audio" loop preload="auto" src="https://cdn.pixabay.com/download/audio/2022/10/30/audio_dacb8102f9.mp3?filename=ocean-waves-10349.mp3"></audio>
+        <div class="lobby-overlay">
+          <div class="topbar">
+            <div class="topbar-left">
+              <span class="topbar-label">Capitão:</span>
+              <span class="topbar-user" id="player-name">Visitante</span>
+            </div>
+            <div class="topbar-actions">
+              <button type="button" id="toggle-audio-button" class="secondary-button">Áudio On</button>
+              <button type="button" id="options-button" class="secondary-button">Opções</button>
+              <button type="button" id="logout-button" class="secondary-button">Sair</button>
+            </div>
+          </div>
+
+          <div class="lobby-grid">
+            <main class="lobby-main">
+              <section class="game-cards">
+                <article class="card">
+                  <div class="card-head">
+                    <h3>Formação da Frota</h3>
+                    <p>Configure seus navios antes de entrar na batalha.</p>
+                  </div>
+                  <div class="card-actions">
+                    <button type="button" id="fleet-config-button" class="primary-button">Configurar Frota</button>
+                  </div>
+                  <div class="card-note" id="fleet-config-status">Pronto para montar sua frota.</div>
+                </article>
+
+                <article class="card">
+                  <div class="card-head">
+                    <h3>Partida Solo</h3>
+                    <p>Inicie uma partida rápida contra a IA.</p>
+                  </div>
+                  <div class="card-actions">
+                    <button type="button" id="start-solo-button" class="primary-button">Jogar Solo</button>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="card-head">
+                    <h3>Histórico Naval</h3>
+                    <p>Veja seu desempenho e vitórias recentes.</p>
+                  </div>
+                  <div class="card-actions">
+                    <button type="button" id="view-history-button" class="secondary-button">Ver Histórico</button>
+                  </div>
+                </article>
+              </section>
+            </main>
+
+            <aside class="lobby-sidebar">
+              <section class="panel player-list-panel">
+                <h3>Jogadores Online</h3>
+                <ul id="player-list" class="player-list">
+                  <li>Aguardando combatentes...</li>
+                </ul>
+              </section>
+
+              <section class="panel history-panel">
+                <h3>Histórico Naval</h3>
+                <ul id="history-list" class="history-list">
+                  <li>Sem partidas recentes.</li>
+                </ul>
+              </section>
+            </aside>
+          </div>
+
+          <div id="options-panel" class="options-panel hidden">
+            <div class="options-card">
+              <div class="options-header">
+                <h4>Menu de opções</h4>
+                <button type="button" id="close-options-button" class="text-button">Fechar</button>
+              </div>
+              <div class="options-body">
+                <p>Use os controles para ativar som, configurar preferências e gerenciar sua conta.</p>
+                <ul>
+                  <li>Volume ambiente</li>
+                  <li>Preferências de notificação</li>
+                  <li>Configurações de exibição</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="battle-screen hidden" id="battle-screen">
+      <div class="battle-screen screen hidden" id="battle-screen">
         <div class="battle-shell">
           <div class="battle-top">
             <div id="ammo-counter" class="ammo-counter" aria-label="Contador de munição">
@@ -74,6 +154,7 @@
               <span class="ammo-value">12</span>
             </div>
             <div id="battle-status" class="battle-status" aria-live="polite">Aguardando inicío...</div>
+            <button type="button" id="forfeit-button" class="secondary-button">Desistir</button>
           </div>
 
           <div class="board-frame">
