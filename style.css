@@ -73,11 +73,6 @@ body {
   padding: 40px 34px;
 }
 
-.login-panel,
-.lobby-panel {
-  padding: 40px 34px;
-}
-
 .brand {
   display: flex;
   align-items: center;
@@ -286,7 +281,7 @@ button:hover {
   height: 100%;
   display: grid;
   gap: 24px;
-  padding: 28px;
+  padding: 24px;
 }
 
 .cannon-image {
@@ -294,16 +289,6 @@ button:hover {
   height: auto;
   max-width: 220px;
   display: block;
-}
-
-.lobby-overlay {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  display: grid;
-  gap: 24px;
-  padding: 24px;
 }
 
 .topbar {
@@ -593,12 +578,6 @@ button:hover {
   min-width: 320px;
 }
 
-.battle-status {
-  font-size: 1rem;
-  color: #ffffff;
-  font-weight: 700;
-}
-
 .battle-substatus {
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.9rem;
@@ -699,12 +678,17 @@ button:hover {
   width: 100%;
   height: 100%;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(77, 181, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(77, 181, 255, 0.02);
   transition: transform 0.2s ease, filter 0.2s ease, background-color 0.2s ease;
   position: relative;
   overflow: hidden;
+}
+
+.board-cell:active {
+  transform: translateY(1px);
+  filter: brightness(1.1);
 }
 
 .board-cell::after {
@@ -723,18 +707,18 @@ button:hover {
   background: radial-gradient(circle, rgba(255, 140, 140, 0.95) 3px, rgba(255, 80, 80, 0.15) 10px, transparent 12px);
 }
 
-.board-cell-miss,
-.board-cell-shot {
+.board-cell-miss {
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
-.board-cell-miss::after,
-.board-cell-shot::after {
+.board-cell-miss::after {
   background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 2px, transparent 4px);
 }
 
 .board-cell-fleet-hit {
-  background: rgba(255, 80, 80, 0.22) !important;
+  background: rgba(255, 160, 120, 0.85) !important;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16);
+  transform: scale(0.98);
 }
 
 .board-cell-fleet-hit::after {
@@ -803,37 +787,11 @@ button:hover {
   );
 }
 
-.board-cell {
-  width: 100%;
-  height: 100%;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(77, 181, 255, 0.02);
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.board-cell:active {
-  transform: translateY(1px);
-  filter: brightness(1.1);
-}
-
-.board-cell-shot {
-  background: rgba(255, 100, 100, 0.9) !important;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
-  transform: scale(0.98);
-}
-
-.board-cell-fleet-hit {
-  background: rgba(255, 160, 120, 0.85) !important;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16);
-  transform: scale(0.98);
-}
-
 .battle-status {
   margin-top: 10px;
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.95rem;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -905,14 +863,7 @@ button:hover {
   display: none !important;
 }
 
-.login-screen.hidden,
-.lobby-screen.hidden,
-.battle-screen.hidden {
-  display: none !important;
-}
-
-.lobby-screen.visible,
-.battle-screen.visible {
+.lobby-screen.visible {
   display: grid;
 }
 
