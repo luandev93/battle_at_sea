@@ -6,7 +6,6 @@ import { coordsForPlacement } from './shipGeometry.js';
 import { getBlueprint } from './fleetBlueprints.js';
 import { markPowerUpCell, clearPowerUpMarkers, getCellElement } from './board.js';
 import { setBattleStatus } from './ui.js';
-import { resetAmmoDisplay } from './ammo.js';
 
 export const powerUpTypes = ['extra_shot', 'revive_ship', 'reposition_ship'];
 
@@ -120,11 +119,6 @@ export function activatePowerUp(type) {
     case 'extra_shot':
       state.extraShotActive = true;
       state.canShoot = true;
-      if (state.reloadInterval) {
-        clearInterval(state.reloadInterval);
-        state.reloadInterval = null;
-      }
-      resetAmmoDisplay();
       setBattleStatus(`Surpresa! ${powerUpLabels[type]} concedido. Dispare novamente.`);
       return true;
 

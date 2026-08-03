@@ -1,4 +1,5 @@
 import {
+  onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -12,7 +13,6 @@ import { auth } from './firebase-config.js';
 import { dom } from './dom.js';
 import { state } from './state.js';
 import { displayError, clearError, fillPlayerHistory, showLobbyScreen, showLoginScreen, setBattleStatus } from './ui.js';
-import { playLobbyAudio } from './audio.js';
 import { updateStatsUI, loadStatsFromFirestore, saveStats } from './stats.js';
 import { loadFleetFromFirestore } from './placement.js';
 import { emitPlayerInfo } from './network.js';
@@ -43,6 +43,69 @@ export function updateCapsLockWarning(event) {
   dom.capsLockWarning.hidden = !isCapsLock;
 }
 
+const REMEMBER_KEY = 'battleAtSea.remember';
+
+// Firebase persists an auth *token*, never the password itself. Keeping
+// the email and the checkbox state locally just saves the player from
+// retyping it; the credential itself is only ever held by Firebase.
+function saveRememberPreference(email) {
+  try {
+    if (dom.rememberMeCheckbox?.checked) {
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ remember: true, email }));
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
+  } catch (e) {
+    // private mode or storage disabled: not worth interrupting login
+  }
+}
+
+export function restoreRememberPreference() {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (dom.rememberMeCheckbox) dom.rememberMeCheckbox.checked = Boolean(saved.remember);
+    if (dom.emailInput && saved.email) dom.emailInput.value = saved.email;
+  } catch (e) {
+    // ignore malformed storage
+  }
+}
+
+// Everything that has to happen once a user is known to be signed in,
+// whether they just typed their password or the session was restored.
+function enterLobbyAsUser(user) {
+  const playerLabel = user.email || 'Capitão';
+  if (dom.playerName) dom.playerName.textContent = playerLabel;
+  fillPlayerHistory(playerLabel);
+
+  state.currentPlayerId = user.uid || user.email || playerLabel;
+  updateStatsUI(state.currentPlayerId);
+
+  loadFleetFromFirestore(state.currentPlayerId).catch(() => {});
+  loadStatsFromFirestore(state.currentPlayerId)
+    .then((remoteStats) => {
+      if (remoteStats) {
+        saveStats(state.currentPlayerId, remoteStats);
+        updateStatsUI(state.currentPlayerId);
+      }
+    })
+    .catch(() => {});
+
+  showLobbyScreen();
+  emitPlayerInfo(playerLabel);
+}
+
+// Without this the persisted session was never read back: the app always
+// opened on the login screen, so "lembrar" had no visible effect.
+export function watchAuthState() {
+  onAuthStateChanged(auth, (user) => {
+    if (user && user.emailVerified) {
+      enterLobbyAsUser(user);
+    }
+  });
+}
+
 export async function handleSignIn() {
   clearError();
   const { email, password } = getCredentials();
@@ -63,26 +126,8 @@ export async function handleSignIn() {
       return;
     }
 
-    const playerLabel = user.email || 'Capitão';
-    if (dom.playerName) dom.playerName.textContent = playerLabel;
-    fillPlayerHistory(playerLabel);
-
-    state.currentPlayerId = user.uid || user.email || playerLabel;
-    updateStatsUI(state.currentPlayerId);
-
-    loadFleetFromFirestore(state.currentPlayerId).catch(() => {});
-    loadStatsFromFirestore(state.currentPlayerId)
-      .then((remoteStats) => {
-        if (remoteStats) {
-          saveStats(state.currentPlayerId, remoteStats);
-          updateStatsUI(state.currentPlayerId);
-        }
-      })
-      .catch(() => {});
-
-    showLobbyScreen();
-    playLobbyAudio();
-    emitPlayerInfo(playerLabel);
+    saveRememberPreference(user.email || email);
+    enterLobbyAsUser(user);
   } catch (error) {
     displayError(error.message || 'Falha ao entrar. Verifique suas credenciais.');
   }
@@ -130,6 +175,15 @@ export async function handlePasswordReset() {
 }
 
 export function logout() {
+  // An explicit logout should not be undone by the restore listener on
+  // the next visit, so drop the remembered preference too.
+  try {
+    localStorage.removeItem(REMEMBER_KEY);
+  } catch (e) {
+    // storage unavailable; signOut below is what actually ends the session
+  }
+  if (dom.rememberMeCheckbox) dom.rememberMeCheckbox.checked = false;
+
   signOut(auth).catch(() => {});
   setBattleStatus('Você saiu. Volte sempre.');
   showLoginScreen();

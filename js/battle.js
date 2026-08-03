@@ -6,10 +6,40 @@ import { BotAI } from './botAI.js';
 import { maybeActivatePowerUp, setupSoloPowerUps } from './powerups.js';
 import { markSunkShipCells, clearGridShots, getCellElement, renderFleetOnGrid } from './board.js';
 import { setBattleStatus, setTargetBadge, displayError, showBattleScreen, setBattleMode } from './ui.js';
-import { startReload, cancelReload } from './ammo.js';
+import { startTurnClock, stopTurnClock, setTurnExpiryHandler } from './turnClock.js';
+import { chainsOnHit } from './matchConfig.js';
+import { getShipIconSvg } from './shipIcons.js';
+import { getShipLabel } from './fleetBlueprints.js';
+import { revealWaterAroundShip } from './fleet.js';
 import { playShotSound, playEnemyShotSound } from './audio.js';
 import { awardPoints } from './stats.js';
 import { emitFireCannon, emitFireResponse, emitDeclineMatch, emitForfeitBattle } from './network.js';
+
+// Centralises every turn handover so the clock, the UI lock and the
+// turn flag can never drift apart.
+function beginPlayerTurn(message) {
+  state.isPlayerTurn = true;
+  state.canShoot = true;
+  setBattleMode('targeting');
+  if (message) setBattleStatus(message);
+  startTurnClock();
+}
+
+function endPlayerTurn(message) {
+  state.isPlayerTurn = false;
+  state.canShoot = false;
+  setBattleMode('waiting');
+  if (message) setBattleStatus(message);
+  stopTurnClock();
+}
+
+function finishMatch(message) {
+  state.isPlayerTurn = false;
+  state.canShoot = false;
+  setBattleMode('waiting');
+  setBattleStatus(message);
+  stopTurnClock();
+}
 
 // --- Solo mode -------------------------------------------------------
 
@@ -24,16 +54,16 @@ export function startSoloMode() {
   state.soloEnemyFleet = createFleet();
   setupSoloPowerUps();
 
-  state.isPlayerTurn = true;
   state.extraShotActive = false;
-  cancelReload(); // a countdown from a previous match may still be ticking
+  stopTurnClock();
 
   clearGridShots(dom.enemyGrid);
   clearGridShots(dom.myGrid);
   renderFleetOnGrid(dom.myGrid, state.playerFleet);
+  renderEnemyFleetStatus();
 
   showBattleScreen('targeting');
-  setBattleStatus('Modo solo iniciado. Sua vez.');
+  beginPlayerTurn('Combate iniciado. Sua vez.');
 }
 
 function processPlayerShot(cell) {
@@ -46,27 +76,34 @@ function processPlayerShot(cell) {
 
   if (hit) {
     cell.classList.add('board-cell-hit');
-    if (sunk && ship) markSunkShipCells(dom.enemyGrid, ship);
+    if (sunk && ship) {
+      markSunkShipCells(dom.enemyGrid, ship);
+      autoRevealWater(dom.enemyGrid, ship);
+      renderEnemyFleetStatus();
+    }
   } else {
     cell.classList.add('board-cell-miss');
   }
 
-  if (powerUpType === 'extra_shot') {
-    setBattleStatus('Tiro Extra ativado! Dispare novamente sem perder o turno.');
-    return;
-  }
-
-  setBattleStatus(hit ? 'Acertou! Aguarde a vez do bot...' : 'Água! Agora é a vez do bot.');
-
   if (hit && sunk && isFleetSunk(state.soloEnemyFleet)) {
-    setBattleStatus('Você derrotou o bot!');
-    setBattleMode('waiting');
+    finishMatch('Você derrotou o bot!');
     awardPoints(1, 'solo_win');
     return;
   }
 
-  state.isPlayerTurn = false;
-  setBattleMode('waiting');
+  if (powerUpType === 'extra_shot') {
+    beginPlayerTurn('Tiro Extra ativado! Dispare novamente.');
+    return;
+  }
+
+  // Chained turns are what give the match its pace: keep firing while
+  // you connect, hand over only on a miss.
+  if (hit && chainsOnHit()) {
+    beginPlayerTurn('Acertou! Dispare novamente.');
+    return;
+  }
+
+  endPlayerTurn(hit ? 'Acertou! Vez do adversário.' : 'Água! Vez do adversário.');
   setTimeout(() => botTakeTurn(), 700);
 }
 
@@ -77,9 +114,7 @@ function botTakeTurn() {
   // No cells left to fire at. Hand the turn back instead of returning
   // early, which used to leave the board frozen in 'waiting' forever.
   if (!shotId) {
-    setBattleStatus('O bot não tem mais alvos. Sua vez.');
-    state.isPlayerTurn = true;
-    setBattleMode('targeting');
+    beginPlayerTurn('O bot não tem mais alvos. Sua vez.');
     return;
   }
 
@@ -110,14 +145,46 @@ function botTakeTurn() {
   }
 
   if (hit && sunk && isFleetSunk(state.playerFleet)) {
-    setBattleStatus('O bot venceu!');
-    setBattleMode('waiting');
+    finishMatch('O bot venceu!');
     return;
   }
 
-  setBattleStatus(hit ? 'O bot acertou! Sua vez.' : 'O bot errou. Agora é sua vez.');
-  state.isPlayerTurn = true;
-  setBattleMode('targeting');
+  if (hit && chainsOnHit()) {
+    setBattleStatus('O bot acertou e dispara de novo...');
+    setTimeout(() => botTakeTurn(), 700);
+    return;
+  }
+
+  beginPlayerTurn(hit ? 'O bot acertou. Sua vez.' : 'O bot errou. Sua vez.');
+}
+
+
+// Marks the ring of guaranteed-water cells around a ship that just sank.
+function autoRevealWater(container, ship) {
+  revealWaterAroundShip(ship).forEach((cellId) => {
+    const cell = getCellElement(container, cellId);
+    if (!cell || cell.dataset.shot) return;
+    cell.dataset.shot = 'true';
+    cell.classList.add('board-cell-miss', 'board-cell-auto');
+  });
+}
+
+// Silhouettes of the enemy fleet, struck through as each one goes down,
+// so the player can see what is still out there.
+function renderEnemyFleetStatus() {
+  if (!dom.enemyFleetStatus) return;
+  const fleet = state.soloEnemyFleet;
+  if (!fleet) {
+    dom.enemyFleetStatus.innerHTML = '';
+    return;
+  }
+
+  dom.enemyFleetStatus.innerHTML = fleet.ships
+    .map((ship) => {
+      const down = ship.hits.size >= ship.size;
+      return `<span class="fleet-chip${down ? ' fleet-chip-down' : ''}" title="${getShipLabel(ship)}">${getShipIconSvg(ship.type)}</span>`;
+    })
+    .join('');
 }
 
 // --- Aiming (periscope reticle + cannon) ------------------------------
@@ -172,7 +239,6 @@ function sendFireCommand(cell) {
 
   cell.dataset.shot = 'true';
   state.canShoot = false;
-  startReload();
 
   if (state.isSoloMode) {
     playShotSound();
@@ -227,12 +293,34 @@ export function handleBoardTouchStart(event) {
   sendFireCommand(findCellFromPoint(touch.clientX, touch.clientY));
 }
 
+// The dedicated FOGO button fires at wherever the reticle currently is,
+// so the player can aim with one thumb and fire with the other instead
+// of having to tap the exact target cell.
+export function handleFireButton() {
+  if (state.lastReticleClientX === null || state.lastReticleClientY === null) {
+    setBattleStatus('Mire no mapa inimigo antes de disparar.');
+    return;
+  }
+  sendFireCommand(findCellFromPoint(state.lastReticleClientX, state.lastReticleClientY));
+}
+
 export function handleSpacebar(event) {
   if (event.code !== 'Space' || event.target.matches('input, textarea, button')) return;
   event.preventDefault();
   if (state.lastReticleClientX === null || state.lastReticleClientY === null) return;
   sendFireCommand(findCellFromPoint(state.lastReticleClientX, state.lastReticleClientY));
 }
+
+// A turn clock running out simply forfeits that turn.
+setTurnExpiryHandler(() => {
+  if (!state.isPlayerTurn) return;
+  if (state.isSoloMode) {
+    endPlayerTurn('Tempo esgotado! Vez do adversário.');
+    setTimeout(() => botTakeTurn(), 500);
+  } else {
+    endPlayerTurn('Tempo esgotado! Vez do adversário.');
+  }
+});
 
 // --- Multiplayer socket reactions (wired in main.js) ---------------------
 
@@ -292,9 +380,11 @@ export function handleMatchFound({ playerIndex, isPlayerTurn }) {
   renderFleetOnGrid(dom.myGrid, state.playerFleet);
 
   showBattleScreen(isPlayerTurn ? 'targeting' : 'waiting');
-  setBattleStatus(
-    isPlayerTurn ? 'Partida online iniciada. Sua vez.' : 'Partida online iniciada. Aguarde o turno do adversário.'
-  );
+  if (isPlayerTurn) {
+    beginPlayerTurn('Partida online iniciada. Sua vez.');
+  } else {
+    endPlayerTurn('Partida online iniciada. Aguarde o adversário.');
+  }
 }
 
 export function handleShotResult(payload) {
@@ -321,8 +411,16 @@ export function handleShotResult(payload) {
     if (winner === state.playerIndex) awardPoints(3, 'pvp_win');
   }
 
-  state.isPlayerTurn = state.playerIndex === nextTurn;
-  setBattleMode(defeated ? 'waiting' : state.isPlayerTurn ? 'targeting' : 'waiting');
+  if (defeated) {
+    finishMatch(winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
+    return;
+  }
+
+  if (state.playerIndex === nextTurn) {
+    beginPlayerTurn(null);
+  } else {
+    endPlayerTurn(null);
+  }
 }
 
 export function handleBattleForfeit({ winner }) {

@@ -11,6 +11,31 @@ export function fleetCanPlace(fleet, coords) {
   return coords.every(({ row, col }) => fleet.grid[row][col] === null);
 }
 
+// Classic Battleship spacing: two ships may never touch, not even at a
+// corner. Each occupied cell must be free, and all eight surrounding
+// cells must be either water or part of the ship being placed itself
+// (its own cells are obviously adjacent to each other).
+export function canPlaceWithSpacing(grid, coords, selfMarker = null) {
+  const own = new Set(coords.map(({ row, col }) => `${row},${col}`));
+
+  return coords.every(({ row, col }) => {
+    if (grid[row][col] !== null && grid[row][col] !== selfMarker) return false;
+
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        if (dr === 0 && dc === 0) continue;
+        const r = row + dr;
+        const c = col + dc;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+        if (own.has(`${r},${c}`)) continue;
+        const occupant = grid[r][c];
+        if (occupant !== null && occupant !== selfMarker) return false;
+      }
+    }
+    return true;
+  });
+}
+
 export function getWaterCells(fleet) {
   const cells = [];
   for (let row = 0; row < GRID_SIZE; row += 1) {
@@ -50,7 +75,7 @@ export function createFleet() {
       const dir = Math.random() < 0.5 ? 1 : -1;
       const cellId = coordToCellId(row, col);
       const coords = coordsForPlacement(cellId, ship, orientation, dir);
-      if (!coords || coords.some(({ row: r, col: c }) => grid[r][c] !== null)) continue;
+      if (!coords || !canPlaceWithSpacing(grid, coords)) continue;
 
       ship.coords = coords;
       ship.orientation = orientation;
@@ -79,6 +104,27 @@ export function applyShotToFleet(fleet, cellId) {
   ship.hits.add(`${row},${col}`);
   const sunk = ship.hits.size === ship.size;
   return { hit: true, sunk, ship };
+}
+
+// Because ships may never touch, every cell surrounding a sunk ship is
+// guaranteed to be water. Revealing it automatically saves the player
+// from spending turns on shots whose outcome is already known.
+export function revealWaterAroundShip(ship) {
+  const around = new Set();
+  const own = new Set(ship.coords.map(({ row, col }) => `${row},${col}`));
+
+  ship.coords.forEach(({ row, col }) => {
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        const r = row + dr;
+        const c = col + dc;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+        if (own.has(`${r},${c}`)) continue;
+        around.add(coordToCellId(r, c));
+      }
+    }
+  });
+  return [...around];
 }
 
 export function isFleetSunk(fleet) {

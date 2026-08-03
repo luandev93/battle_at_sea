@@ -68,6 +68,38 @@ body {
   place-items: center;
 }
 
+.login-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Faint motion backdrop behind the login form. Kept very low contrast
+   so the inputs stay comfortably readable. */
+.login-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.18;
+  filter: saturate(0.7) brightness(0.75) blur(1px);
+  pointer-events: none;
+}
+
+.login-video-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 12, 20, 0.72), rgba(3, 9, 16, 0.88));
+}
+
+.login-panel {
+  position: relative;
+  z-index: 2;
+}
+
 .login-panel,
 .lobby-panel {
   padding: 40px 34px;
@@ -254,17 +286,6 @@ button:hover {
   align-items: stretch;
 }
 
-.lobby-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 0;
-  filter: saturate(1.1) brightness(0.62) contrast(1.18);
-  opacity: 0.82;
-}
-
 .lobby-overlay::before {
   content: '';
   position: absolute;
@@ -282,13 +303,6 @@ button:hover {
   display: grid;
   gap: 24px;
   padding: 24px;
-}
-
-.cannon-image {
-  width: 100%;
-  height: auto;
-  max-width: 220px;
-  display: block;
 }
 
 .topbar {
@@ -614,7 +628,7 @@ button:hover {
 
 .board-row-labels {
   display: grid;
-  grid-template-rows: repeat(14, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--grid-size, 14), minmax(0, 1fr));
   gap: 8px;
   color: rgba(255,255,255,0.68);
   font-size: 0.82rem;
@@ -624,7 +638,7 @@ button:hover {
 
 .board-column-labels {
   display: grid;
-  grid-template-columns: repeat(14, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--grid-size, 14), minmax(0, 1fr));
   gap: 8px;
   color: rgba(255,255,255,0.68);
   font-size: 0.82rem;
@@ -651,15 +665,14 @@ button:hover {
   width: 100%;
   aspect-ratio: 1 / 1;
   display: grid;
-  grid-template-columns: repeat(14, 1fr);
-  grid-template-rows: repeat(14, 1fr);
+  grid-template-columns: repeat(var(--grid-size, 14), 1fr);
+  grid-template-rows: repeat(var(--grid-size, 14), 1fr);
   gap: 3px;
   padding: 10px;
-  background: radial-gradient(circle at center, rgba(77, 181, 255, 0.1), transparent 55%),
-    linear-gradient(180deg, rgba(8, 22, 40, 0.96), rgba(3, 10, 18, 0.96));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 28px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, #22506e 0%, #1b4159 100%);
+  border: 2px solid rgba(150, 200, 235, 0.5);
+  border-radius: 18px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   position: relative;
   touch-action: none;
   user-select: none;
@@ -721,10 +734,9 @@ button:hover {
 .board-cell {
   width: 100%;
   height: 100%;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(77, 181, 255, 0.02);
+  border-radius: 4px;
+  background: rgba(190, 224, 245, 0.16);
+  border: 1px solid rgba(190, 224, 245, 0.22);
   transition: transform 0.2s ease, filter 0.2s ease, background-color 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -802,10 +814,25 @@ button:hover {
     radial-gradient(circle, rgba(255, 225, 100, 0.6) 6px, transparent 9px);
 }
 
-/* "Meu Lado" grid: renders the player's own ship hulls */
+/* "Meu Lado" grid: each hull is tinted with its own colour, set as the
+   --ship-color custom property by the placement renderer. */
 .board-cell-fleet {
-  background: rgba(120, 160, 200, 0.32) !important;
-  box-shadow: inset 0 0 0 1px rgba(190, 215, 235, 0.35);
+  background: var(--ship-color, #4db5ff) !important;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+/* The piece currently being positioned pulses so it is obvious which
+   ship the movement arrows will act on. */
+.board-cell-fleet-active {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+  animation: activePulse 1.3s ease-in-out infinite;
+}
+
+@keyframes activePulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.45); }
 }
 
 /* live drag preview while placing/repositioning a ship */
@@ -932,6 +959,11 @@ button:hover {
   opacity: 1;
 }
 
+#tactical-board:not([data-mode="targeting"]) #rustic-cannon {
+  pointer-events: none;
+  visibility: hidden;
+}
+
 #tactical-board:not([data-mode="targeting"]) #enemy-grid {
   pointer-events: none;
 }
@@ -1039,6 +1071,328 @@ button:hover {
 
 .icon-button-primary span {
   color: var(--accent-strong);
+}
+
+
+
+/* --- Room creation, turn clock, enemy fleet status --- */
+
+.room-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(2, 8, 15, 0.82);
+  backdrop-filter: blur(4px);
+  overflow-y: auto;
+}
+
+.room-panel.hidden { display: none; }
+
+.room-card {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 22px;
+  background: rgba(9, 20, 32, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.room-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.room-header h4 { margin: 0; font-size: 1.05rem; }
+
+.room-section { display: grid; gap: 8px; }
+
+.room-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.room-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.room-option {
+  flex: 1 1 auto;
+  min-width: 90px;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.room-option strong { font-size: 0.85rem; }
+.room-option small { font-size: 0.66rem; color: var(--muted); }
+
+.room-option-on {
+  background: rgba(77, 181, 255, 0.2);
+  border-color: rgba(77, 181, 255, 0.6);
+}
+
+.room-option-on small { color: var(--accent-strong); }
+
+.room-toggles {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.room-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.room-start { width: 100%; }
+
+.turn-clock {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(77, 181, 255, 0.35);
+}
+
+.turn-clock-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.turn-clock-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent-strong);
+}
+
+.turn-clock-urgent {
+  border-color: rgba(255, 100, 100, 0.8);
+  animation: clockPulse 1s ease-in-out infinite;
+}
+
+.turn-clock-urgent .turn-clock-value { color: #ff8a8a; }
+
+@keyframes clockPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.enemy-fleet-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.fleet-chip {
+  display: inline-flex;
+  color: rgba(190, 220, 245, 0.9);
+}
+
+.fleet-chip .ship-icon { width: 30px; height: 15px; }
+
+.fleet-chip-down {
+  color: rgba(255, 110, 110, 0.55);
+  position: relative;
+}
+
+.fleet-chip-down::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: rgba(255, 110, 110, 0.9);
+}
+
+/* Cells revealed automatically around a sunk ship read fainter than
+   cells the player actually fired at. */
+.board-cell-auto { opacity: 0.62; }
+
+/* --- Movement pad, colour palette, fire button, cannon --- */
+
+.move-pad {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.move-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.move-btn:active {
+  background: rgba(77, 181, 255, 0.3);
+  transform: scale(0.94);
+}
+
+.move-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.move-btn-alt {
+  background: rgba(77, 181, 255, 0.14);
+  border-color: rgba(77, 181, 255, 0.35);
+  color: var(--accent-strong);
+}
+
+.color-palette {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.palette-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.palette-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.palette-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.palette-swatch-on {
+  border-color: #ffffff;
+  transform: scale(1.12);
+}
+
+.selector-add {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(77, 181, 255, 0.45);
+  background: rgba(77, 181, 255, 0.2);
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.selector-add:active {
+  background: rgba(77, 181, 255, 0.38);
+  transform: scale(0.96);
+}
+
+/* The cannon is a fixed prop anchored to the corner of the viewport, not
+   a board element: the old PNG carried a white background box that sat
+   on top of the map. This is inline SVG, so there is nothing to hide. */
+.rustic-cannon {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  width: 132px;
+  max-width: 34vw;
+  z-index: 20;
+  pointer-events: none;
+  transform-origin: 30% 75%;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+}
+
+.cannon-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.fire-button {
+  position: fixed;
+  right: 14px;
+  bottom: 18px;
+  z-index: 21;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 120, 120, 0.75);
+  background: radial-gradient(circle at 50% 40%, #b3323f 0%, #7d1f2a 100%);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fire-button svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.fire-button span {
+  font-size: 0.66rem;
+}
+
+.fire-button:active {
+  transform: scale(0.92);
+}
+
+#tactical-board[data-mode="targeting"] .fire-button {
+  display: flex;
 }
 
 .ship-selector {

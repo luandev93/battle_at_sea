@@ -18,11 +18,10 @@ export function setAudioMuted(value) {
     dom.toggleAudioButton.classList.toggle('active', !state.audioMuted);
   }
 
-  if (dom.lobbyVideo) {
-    dom.lobbyVideo.muted = state.audioMuted;
-    dom.lobbyVideo.volume = state.audioMuted ? 0 : 1;
+  if (dom.loginVideo) {
+    dom.loginVideo.muted = true;
     if (!state.audioMuted && state.currentScreen === 'lobby') {
-      dom.lobbyVideo.play().catch(() => {});
+      dom.loginVideo.play().catch(() => {});
     }
   }
 
@@ -149,15 +148,14 @@ export function playEnemyShotSound() {
   osc.stop(now + 0.4);
 }
 
-export function playLobbyAudio() {
+export function playLoginVideo() {
   if (state.audioMuted) return;
-  if (dom.lobbyVideo) {
-    dom.lobbyVideo.muted = false;
-    dom.lobbyVideo.volume = 1;
-    dom.lobbyVideo.play().catch(() => {});
+  if (dom.loginVideo) {
+    dom.loginVideo.muted = true;
+    dom.loginVideo.play().catch(() => {});
   }
 }
 
-export function pauseLobbyAudio() {
-  dom.lobbyVideo?.pause();
+export function pauseLoginVideo() {
+  dom.loginVideo?.pause();
 }

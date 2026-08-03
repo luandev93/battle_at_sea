@@ -1,6 +1,6 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { playLobbyAudio, pauseLobbyAudio, startAmbientSound, stopAmbientSound } from './audio.js';
+import { playLoginVideo, pauseLoginVideo, startAmbientSound, stopAmbientSound } from './audio.js';
 
 export function displayError(message) {
   if (dom.errorMessage) {
@@ -52,7 +52,7 @@ export function showLoginScreen() {
   dom.lobbyScreen?.classList.remove('visible');
   dom.battleScreen?.classList.add('hidden');
   dom.battleScreen?.classList.remove('visible');
-  pauseLobbyAudio();
+  playLoginVideo();
   stopAmbientSound();
 }
 
@@ -64,7 +64,7 @@ export function showLobbyScreen() {
   dom.battleScreen?.classList.add('hidden');
   dom.battleScreen?.classList.remove('visible');
   stopAmbientSound();
-  playLobbyAudio();
+  pauseLoginVideo();
 }
 
 // `mode` is 'setup' | 'waiting' | 'targeting' and drives which parts of
@@ -81,7 +81,7 @@ export function showBattleScreen(mode = 'waiting') {
   if (dom.tacticalBoard) {
     dom.tacticalBoard.dataset.mode = mode;
   }
-  pauseLobbyAudio();
+  pauseLoginVideo();
   startAmbientSound();
 }
 

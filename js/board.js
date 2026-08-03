@@ -1,6 +1,6 @@
 import { coordToCellId, GRID_SIZE } from './utils.js';
 
-const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+const ROW_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
 
 // Builds a 10x10 grid of `.board-cell` divs inside `container` instead
 // of hard-coding 100 <div> elements per grid in index.html.
@@ -21,7 +21,7 @@ export function generateGridCells(container) {
 // wrap a grid, given the two label container elements.
 export function generateGridCoords(columnLabelsEl, rowLabelsEl) {
   if (columnLabelsEl) {
-    columnLabelsEl.innerHTML = ROW_LETTERS.map((letter) => `<span>${letter}</span>`).join('');
+    columnLabelsEl.innerHTML = ROW_LETTERS.slice(0, GRID_SIZE).map((letter) => `<span>${letter}</span>`).join('');
   }
   if (rowLabelsEl) {
     rowLabelsEl.innerHTML = Array.from({ length: GRID_SIZE }, (_, i) => `<span>${i + 1}</span>`).join('');

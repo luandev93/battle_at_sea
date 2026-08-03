@@ -26,7 +26,7 @@ export const dom = {
   battleScreen: byId('battle-screen'),
 
   // lobby
-  lobbyVideo: byId('lobby-video'),
+  loginVideo: byId('login-video'),
   toggleAudioButton: byId('toggle-audio-button'),
   logoutButton: byId('logout-button'),
   optionsButton: byId('options-button'),
@@ -63,6 +63,8 @@ export const dom = {
   // fleet setup (visible only in setup mode)
   shipSelector: byId('ship-selector'),
   setupMessage: byId('setup-message'),
+  colorPalette: byId('color-palette'),
+  movePad: byId('move-pad'),
   rotateShipButton: byId('rotate-ship'),
   flipShipButton: byId('flip-ship'),
   clearGridButton: byId('clear-grid'),
@@ -73,10 +75,20 @@ export const dom = {
   // periscope / cannon HUD (visible only in targeting mode)
   periscopeReticle: byId('periscope-reticle'),
   cannon: byId('rustic-cannon'),
-  ammoCounter: byId('ammo-counter'),
+  turnClock: byId('turn-clock'),
+  turnClockValue: byId('turn-clock-value'),
+  enemyFleetStatus: byId('enemy-fleet-status'),
+
+  // room creation
+  roomPanel: byId('room-panel'),
+  closeRoomButton: byId('close-room-button'),
+  startMatchButton: byId('start-match-button'),
+  roomPowerUps: byId('room-powerups'),
+  roomMusic: byId('room-music'),
   battleStatus: byId('battle-status'),
   targetBadge: byId('target-badge'),
+  fireButton: byId('fire-button'),
 };
 
-// queried lazily because it's inside ammoCounter, which may be null
-dom.ammoValue = dom.ammoCounter?.querySelector('.ammo-value') ?? null;
+// Directional nudge buttons carry their delta in data attributes.
+dom.moveButtons = dom.movePad ? Array.from(dom.movePad.querySelectorAll('.move-btn[data-dr]')) : [];

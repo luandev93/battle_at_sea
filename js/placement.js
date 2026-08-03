@@ -6,7 +6,7 @@ import { GRID_SIZE, coordToCellId, cellIdToCoord } from './utils.js';
 import { fleetBlueprints, getBlueprint, getShipLabel } from './fleetBlueprints.js';
 import { getShipIconSvg } from './shipIcons.js';
 import { coordsForPlacement, coordsForPlacementClamped, getPatternBounds, rotateAndFlipPattern } from './shipGeometry.js';
-import { fleetCanPlace, buildPlayerFleetFromPlacement } from './fleet.js';
+import { canPlaceWithSpacing, buildPlayerFleetFromPlacement } from './fleet.js';
 import { getCellElement } from './board.js';
 import { setBattleStatus, showLobbyScreen } from './ui.js';
 
@@ -28,9 +28,25 @@ let dragOriginalCoords = null;
 let dragOriginalOrientation = null;
 let dragOriginalDir = null;
 
-function canPlace(coords) {
-  return fleetCanPlace(state.placement, coords);
+// Ships may never touch, not even diagonally, so the check has to look
+// at the ring around each cell. `selfId` lets a ship ignore its own
+// footprint while it is being nudged or rotated in place.
+function canPlace(coords, selfId = null) {
+  return canPlaceWithSpacing(state.placement.grid, coords, selfId);
 }
+
+// One default colour per hull type, so the fleet reads as distinct
+// vessels at a glance; the player can override any of them.
+const SHIP_COLORS = ['#4db5ff', '#ffd166', '#06d6a0', '#ef476f', '#c792ea', '#f78c6b', '#8ecae6', '#b5e48c'];
+const DEFAULT_COLOR_BY_TYPE = {
+  admiral: '#ffd166',
+  hospital: '#ef476f',
+  aircraft: '#06d6a0',
+  destroyer: '#4db5ff',
+  torpedo: '#f78c6b',
+  carrier: '#c792ea',
+  submarine: '#8ecae6',
+};
 
 export function initPlacement() {
   const grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
@@ -39,11 +55,19 @@ export function initPlacement() {
   fleetBlueprints.forEach((blueprint) => {
     const count = blueprint.count || 1;
     for (let i = 0; i < count; i += 1) {
-      ships.push({ id: `s${ships.length}`, type: blueprint.type, coords: [], orientation: 'horizontal', dir: 1 });
+      ships.push({
+        id: `s${ships.length}`,
+        type: blueprint.type,
+        coords: [],
+        orientation: 'horizontal',
+        dir: 1,
+        color: DEFAULT_COLOR_BY_TYPE[blueprint.type] || SHIP_COLORS[0],
+      });
     }
   });
 
   state.placement = { grid, ships };
+  state.activeShipId = null;
 }
 
 // --- rendering ---------------------------------------------------------
@@ -105,6 +129,7 @@ export function cycleSelection(step) {
 }
 
 export function renderInventory() {
+  renderColorPalette();
   if (!dom.shipSelector) return;
   normalizeSelection();
 
@@ -127,32 +152,192 @@ export function renderInventory() {
   dom.shipSelector.innerHTML = `
     <button type="button" class="selector-arrow" data-step="-1" aria-label="Navio anterior">‹</button>
     <div class="selector-body">
-      <div class="selector-icon">${getShipIconSvg(ship.type)}</div>
+      <div class="selector-icon" style="color:${ship.color}">${getShipIconSvg(ship.type)}</div>
       <div class="selector-meta">
         <span class="selector-name">${getShipLabel(ship)}</span>
-        <span class="selector-count">${sameType > 1 ? `${sameType} restantes · ` : ''}${placedCount}/${total} posicionados</span>
+        <span class="selector-count">${sameType > 1 ? `${sameType} restantes · ` : ''}${placedCount}/${total} na grade</span>
       </div>
-      <div class="selector-footprint" id="selector-footprint"></div>
     </div>
-    <button type="button" class="selector-arrow" data-step="1" aria-label="Próximo navio">›</button>`;
-
-  dom.shipSelector.querySelector('#selector-footprint')?.appendChild(buildSilhouette(ship));
+    <button type="button" class="selector-arrow" data-step="1" aria-label="Próximo navio">›</button>
+    <button type="button" class="selector-add" id="add-to-grid">Adicionar</button>`;
 
   dom.shipSelector.querySelectorAll('.selector-arrow').forEach((btn) => {
     btn.addEventListener('click', () => cycleSelection(Number(btn.dataset.step)));
   });
+  dom.shipSelector.querySelector('#add-to-grid')?.addEventListener('click', addSelectedToGrid);
 }
+
+// Palette for recolouring whichever ship is currently active on the grid.
+function renderColorPalette() {
+  if (!dom.colorPalette) return;
+  const ship = getActiveShip();
+
+  if (!ship || ship.coords.length === 0) {
+    dom.colorPalette.innerHTML = '<span class="palette-hint">Toque num navio da grade para mudar a cor</span>';
+    return;
+  }
+
+  dom.colorPalette.innerHTML =
+    `<span class="palette-label">${getShipLabel(ship)}</span>` +
+    SHIP_COLORS.map(
+      (c) =>
+        `<button type="button" class="palette-swatch${c === ship.color ? ' palette-swatch-on' : ''}" data-color="${c}" style="background:${c}" aria-label="Cor ${c}"></button>`
+    ).join('');
+
+  dom.colorPalette.querySelectorAll('.palette-swatch').forEach((btn) => {
+    btn.addEventListener('click', () => setActiveColor(btn.dataset.color));
+  });
+}
+
+// --- Add-to-grid then nudge into position -------------------------------
+
+export function getActiveShip() {
+  return state.placement?.ships.find((s) => s.id === state.activeShipId) || null;
+}
+
+function occupy(ship, coords) {
+  ship.coords = coords;
+  coords.forEach(({ row, col }) => {
+    state.placement.grid[row][col] = ship.id;
+  });
+}
+
+function vacate(ship) {
+  ship.coords.forEach(({ row, col }) => {
+    state.placement.grid[row][col] = null;
+  });
+  ship.coords = [];
+}
+
+// Drops the selected ship onto the first spot that satisfies the spacing
+// rule, scanning from the top-left, then makes it the active piece so the
+// movement controls take over.
+export function addSelectedToGrid() {
+  normalizeSelection();
+  const ship = state.placement.ships.find((s) => s.id === state.selectedShipId);
+  if (!ship) {
+    setSetupMessage('Todos os navios já estão na grade.', true);
+    return;
+  }
+
+  for (let cellId = 1; cellId <= GRID_SIZE * GRID_SIZE; cellId += 1) {
+    const coords = coordsForPlacementClamped(cellId, ship, state.placingOrientation, state.placingDir);
+    if (coords && canPlace(coords, ship.id)) {
+      ship.orientation = state.placingOrientation;
+      ship.dir = state.placingDir;
+      occupy(ship, coords);
+      state.activeShipId = ship.id;
+      renderPlacementToDOM();
+      renderInventory();
+      setSetupMessage(`${getShipLabel(ship)} na grade. Use as setas para posicionar.`);
+      return;
+    }
+  }
+  setSetupMessage('Sem espaço livre para este navio. Remova ou reposicione outro.', true);
+}
+
+// Shifts the active ship by one cell, if the destination is legal.
+export function moveActiveShip(dRow, dCol) {
+  const ship = getActiveShip();
+  if (!ship || ship.coords.length === 0) {
+    setSetupMessage('Adicione um navio à grade antes de movê-lo.', true);
+    return;
+  }
+
+  const target = ship.coords.map(({ row, col }) => ({ row: row + dRow, col: col + dCol }));
+  if (target.some(({ row, col }) => row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE)) {
+    setSetupMessage('O navio chegou à borda do tabuleiro.', true);
+    return;
+  }
+
+  const previous = ship.coords;
+  vacate(ship);
+  if (canPlace(target, ship.id)) {
+    occupy(ship, target);
+    setSetupMessage('');
+  } else {
+    occupy(ship, previous);
+    setSetupMessage('Movimento bloqueado: navios não podem se encostar.', true);
+  }
+  renderPlacementToDOM();
+}
+
+// Re-orients the active ship around its current anchor. Falls back to
+// the global orientation for the *next* ship when nothing is active.
+function reorientActive(nextOrientation, nextDir) {
+  const ship = getActiveShip();
+  state.placingOrientation = nextOrientation;
+  state.placingDir = nextDir;
+
+  if (!ship || ship.coords.length === 0) {
+    renderInventory();
+    return;
+  }
+
+  const anchor = ship.coords.reduce(
+    (acc, c) => ({ row: Math.min(acc.row, c.row), col: Math.min(acc.col, c.col) }),
+    { row: GRID_SIZE, col: GRID_SIZE }
+  );
+  const anchorCell = coordToCellId(anchor.row, anchor.col);
+  const target = coordsForPlacementClamped(anchorCell, ship, nextOrientation, nextDir);
+
+  const previous = ship.coords;
+  vacate(ship);
+  if (target && canPlace(target, ship.id)) {
+    ship.orientation = nextOrientation;
+    ship.dir = nextDir;
+    occupy(ship, target);
+    setSetupMessage('');
+  } else {
+    occupy(ship, previous);
+    setSetupMessage('Não há espaço para girar aqui. Mova o navio e tente de novo.', true);
+  }
+  renderPlacementToDOM();
+  renderInventory();
+}
+
+export function rotateActive() {
+  reorientActive(state.placingOrientation === 'horizontal' ? 'vertical' : 'horizontal', state.placingDir);
+}
+
+export function flipActive() {
+  reorientActive(state.placingOrientation, state.placingDir === 1 ? -1 : 1);
+}
+
+export function setActiveColor(color) {
+  const ship = getActiveShip();
+  if (!ship) {
+    setSetupMessage('Selecione um navio na grade para trocar a cor.', true);
+    return;
+  }
+  ship.color = color;
+  renderPlacementToDOM();
+  renderInventory();
+}
+
+export { SHIP_COLORS };
 
 export function renderPlacementToDOM() {
   if (!dom.myGrid) return;
   const cells = dom.myGrid.querySelectorAll('.board-cell');
   cells.forEach((cell) => {
-    cell.classList.remove('board-cell-fleet', 'board-cell-fleet-preview', 'board-cell-fleet-invalid');
+    cell.classList.remove(
+      'board-cell-fleet',
+      'board-cell-fleet-active',
+      'board-cell-fleet-preview',
+      'board-cell-fleet-invalid'
+    );
+    cell.style.removeProperty('--ship-color');
   });
 
   state.placement.ships.forEach((ship) => {
+    const isActive = ship.id === state.activeShipId;
     ship.coords.forEach(({ row, col }) => {
-      getCellElement(dom.myGrid, coordToCellId(row, col))?.classList.add('board-cell-fleet');
+      const cell = getCellElement(dom.myGrid, coordToCellId(row, col));
+      if (!cell) return;
+      cell.classList.add('board-cell-fleet');
+      if (isActive) cell.classList.add('board-cell-fleet-active');
+      cell.style.setProperty('--ship-color', ship.color);
     });
   });
 }
@@ -240,10 +425,11 @@ function handleDragMove(event) {
     clearPreview();
     return;
   }
-  showPreview(coords, canPlace(coords));
+  showPreview(coords, canPlace(coords, ship.id));
 }
 
 function commitPlacement(ship, coords) {
+  state.activeShipId = ship.id;
   ship.coords = coords;
   ship.orientation = state.placingOrientation;
   ship.dir = state.placingDir;
@@ -279,7 +465,7 @@ function handleDragEnd(event) {
 
   if (ship && cell) {
     const coords = coordsForPlacementClamped(cell.dataset.cell, ship, state.placingOrientation, state.placingDir);
-    if (coords && canPlace(coords)) {
+    if (coords && canPlace(coords, ship.id)) {
       commitPlacement(ship, coords);
       setSetupMessage('');
     } else if (dragIsReposition) {
@@ -341,6 +527,7 @@ function handleGridPointerDown(event) {
   const shipId = state.placement.grid[row][col];
 
   if (shipId) {
+    state.activeShipId = shipId;
     startDragFromGrid(event, shipId);
     return;
   }
@@ -356,7 +543,7 @@ function handleGridPointerDown(event) {
   // the finger lifts, instead of only reacting once it moves.
   const ship = state.placement.ships.find((s) => s.id === state.selectedShipId);
   const coords = coordsForPlacementClamped(cell.dataset.cell, ship, state.placingOrientation, state.placingDir);
-  if (coords) showPreview(coords, canPlace(coords));
+  if (coords) showPreview(coords, canPlace(coords, ship.id));
 }
 
 // --- bulk actions -------------------------------------------------------
@@ -366,6 +553,7 @@ export function clearPlacement() {
     s.coords = [];
   });
   state.placement.grid.forEach((row) => row.fill(null));
+  state.activeShipId = null;
   renderPlacementToDOM();
   renderInventory();
 }
@@ -382,6 +570,7 @@ export function randomizePlacement() {
     (a, b) => (getBlueprint(b.type)?.pattern.length || 0) - (getBlueprint(a.type)?.pattern.length || 0)
   );
 
+  state.activeShipId = null;
   shipsToPlace.forEach((ship) => {
     let placed = false;
     let attempts = 0;
@@ -393,7 +582,7 @@ export function randomizePlacement() {
       const dir = Math.random() < 0.5 ? 1 : -1;
       const cellId = row * GRID_SIZE + col + 1;
       const coords = coordsForPlacement(cellId, ship, orientation, dir);
-      if (!coords || !canPlace(coords)) continue;
+      if (!coords || !canPlace(coords, ship.id)) continue;
 
       ship.coords = coords;
       ship.orientation = orientation;
@@ -490,14 +679,13 @@ export async function loadFleetFromFirestore(id) {
 }
 
 export function wireFleetSetupControls() {
-  dom.rotateShipButton?.addEventListener('click', () => {
-    state.placingOrientation = state.placingOrientation === 'horizontal' ? 'vertical' : 'horizontal';
-    renderInventory();
-  });
+  dom.rotateShipButton?.addEventListener('click', rotateActive);
+  dom.flipShipButton?.addEventListener('click', flipActive);
 
-  dom.flipShipButton?.addEventListener('click', () => {
-    state.placingDir = state.placingDir === 1 ? -1 : 1;
-    renderInventory();
+  dom.moveButtons?.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      moveActiveShip(Number(btn.dataset.dr), Number(btn.dataset.dc));
+    });
   });
 
   dom.clearGridButton?.addEventListener('click', () => clearPlacement());

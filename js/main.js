@@ -1,11 +1,11 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
 import { generateGridCells, generateGridCoords } from './board.js';
-import { resetAmmoDisplay } from './ammo.js';
 import { toggleAudioMuted } from './audio.js';
 import { openOptions, closeOptions, fillOnlinePlayers, fillPlayerHistory, showBattleScreen, showLobbyScreen } from './ui.js';
 import { setPowerUpsEnabled } from './powerups.js';
 import { socket } from './network.js';
+import { applyMatchConfig, matchConfig } from './matchConfig.js';
 import { wireFleetSetupControls, enterFleetSetup } from './placement.js';
 import {
   handleSignIn,
@@ -14,6 +14,8 @@ import {
   togglePasswordVisibility,
   updateCapsLockWarning,
   logout,
+  watchAuthState,
+  restoreRememberPreference,
 } from './auth.js';
 import {
   startSoloMode,
@@ -23,6 +25,7 @@ import {
   handleBoardTouchStart,
   handleBoardTouchMove,
   handleSpacebar,
+  handleFireButton,
   handleOpponentFire,
   handleMatchFound,
   handleShotResult,
@@ -33,11 +36,19 @@ import {
 
 // --- initial render -----------------------------------------------------
 
-generateGridCells(dom.enemyGrid);
-generateGridCells(dom.myGrid);
-generateGridCoords(dom.enemyColLabels, dom.enemyRowLabels);
-generateGridCoords(dom.myColLabels, dom.myRowLabels);
-resetAmmoDisplay();
+// Draw the boards at whatever size the current match config asks for.
+function rebuildBoards() {
+  generateGridCells(dom.enemyGrid);
+  generateGridCells(dom.myGrid);
+  generateGridCoords(dom.enemyColLabels, dom.enemyRowLabels);
+  generateGridCoords(dom.myColLabels, dom.myRowLabels);
+}
+
+restoreRememberPreference();
+watchAuthState();
+
+applyMatchConfig();
+rebuildBoards();
 wireFleetSetupControls();
 
 // --- login screen ---------------------------------------------------------
@@ -63,7 +74,33 @@ dom.passwordInput.addEventListener('blur', () => {
 
 // --- lobby screen -----------------------------------------------------------
 
-dom.startSoloButton?.addEventListener('click', startSoloMode);
+// "Combate Solo" now opens the room setup instead of launching straight
+// into a match, so the rules are chosen up front.
+dom.startSoloButton?.addEventListener('click', () => dom.roomPanel?.classList.remove('hidden'));
+dom.closeRoomButton?.addEventListener('click', () => dom.roomPanel?.classList.add('hidden'));
+
+// Each option group behaves like a radio set.
+document.querySelectorAll('.room-options').forEach((group) => {
+  group.addEventListener('click', (event) => {
+    const btn = event.target.closest('.room-option');
+    if (!btn) return;
+    group.querySelectorAll('.room-option').forEach((b) => b.classList.remove('room-option-on'));
+    btn.classList.add('room-option-on');
+    applyMatchConfig({ [group.dataset.key]: btn.dataset.value });
+    rebuildBoards();
+  });
+});
+
+dom.startMatchButton?.addEventListener('click', () => {
+  applyMatchConfig({
+    powerUps: Boolean(dom.roomPowerUps?.checked),
+    music: Boolean(dom.roomMusic?.checked),
+  });
+  setPowerUpsEnabled(matchConfig.powerUps);
+  rebuildBoards();
+  dom.roomPanel?.classList.add('hidden');
+  startSoloMode();
+});
 dom.logoutButton?.addEventListener('click', logout);
 dom.toggleAudioButton?.addEventListener('click', toggleAudioMuted);
 dom.optionsButton?.addEventListener('click', openOptions);
@@ -88,6 +125,7 @@ if (dom.enemyGrid) {
   dom.enemyGrid.addEventListener('touchmove', handleBoardTouchMove, { passive: false });
 }
 
+dom.fireButton?.addEventListener('click', handleFireButton);
 document.addEventListener('keydown', handleSpacebar);
 
 // --- multiplayer events ---------------------------------------------------------

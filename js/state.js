@@ -9,7 +9,7 @@ export const state = {
   playerIndex: null,
   isPlayerTurn: false,
   canShoot: true,
-  reloadInterval: null,
+  turnClockInterval: null,
 
   // aiming
   lastReticleClientX: null,
@@ -41,6 +41,7 @@ export const state = {
   placingDir: 1, // 1 forward, -1 reverse
   placement: null, // { grid: 14x14 of null|shipId, ships: [...] }
   selectedShipId: null, // ship currently armed in the setup selector
+  activeShipId: null,   // ship on the grid that the movement pad controls
 
   // which screen is currently visible: 'login' | 'lobby' | 'battle'
   currentScreen: 'login',
