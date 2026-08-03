@@ -63,7 +63,7 @@ export const dom = {
   // fleet setup (visible only in setup mode)
   shipSelector: byId('ship-selector'),
   setupMessage: byId('setup-message'),
-  colorPalette: byId('color-palette'),
+  fleetRoster: byId('fleet-roster'),
   movePad: byId('move-pad'),
   rotateShipButton: byId('rotate-ship'),
   flipShipButton: byId('flip-ship'),
@@ -87,6 +87,8 @@ export const dom = {
   roomMusic: byId('room-music'),
   battleStatus: byId('battle-status'),
   targetBadge: byId('target-badge'),
+  turnIndicator: byId('turn-indicator'),
+  muzzleFlash: byId('muzzle-flash'),
   fireButton: byId('fire-button'),
 };
 

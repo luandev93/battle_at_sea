@@ -207,6 +207,7 @@
               <div class="battle-status-panel">
                 <span id="battle-status" class="battle-status" aria-live="polite">Configure sua frota</span>
                 <span id="target-badge" class="target-badge">SALVA PRONTA</span>
+                <span id="turn-indicator" class="turn-indicator">AGUARDE</span>
               </div>
             </div>
             <div class="battle-top-actions">
@@ -234,6 +235,7 @@
                   </div>
                 </div>
               </div>
+              <div id="muzzle-flash" class="muzzle-flash" aria-hidden="true"></div>
               <div id="rustic-cannon" class="rustic-cannon" aria-hidden="true">
                 <svg viewBox="0 0 64 40" class="cannon-svg">
                   <ellipse cx="26" cy="34" rx="20" ry="5" fill="rgba(0,0,0,0.45)"/>
@@ -283,7 +285,7 @@
                 </button>
               </div>
 
-              <div class="color-palette" id="color-palette" aria-label="Cor do navio"></div>
+              <div class="fleet-roster" id="fleet-roster" aria-label="Frota a posicionar"></div>
 
               <div class="setup-controls" id="setup-controls">
                 <button type="button" id="randomize-grid" class="icon-button" title="Preencher aleatoriamente" aria-label="Preencher aleatoriamente">

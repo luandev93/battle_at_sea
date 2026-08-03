@@ -12,6 +12,7 @@ export const state = {
   turnClockInterval: null,
 
   // aiming
+  selectedCellId: null, // logical target cell, moved with taps or arrow keys
   lastReticleClientX: null,
   lastReticleClientY: null,
 

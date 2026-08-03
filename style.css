@@ -816,12 +816,6 @@ button:hover {
 
 /* "Meu Lado" grid: each hull is tinted with its own colour, set as the
    --ship-color custom property by the placement renderer. */
-.board-cell-fleet {
-  background: var(--ship-color, #4db5ff) !important;
-  border-color: rgba(255, 255, 255, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-}
-
 /* The piece currently being positioned pulses so it is obvious which
    ship the movement arrows will act on. */
 .board-cell-fleet-active {
@@ -1020,6 +1014,31 @@ button:hover {
 }
 
 
+.board-cell-fleet {
+  background: var(--ship-color, #4db5ff) !important;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+/* Damage always wins over hull colour, so a hit is visible on your own
+   ships. These come after the fleet rule on purpose. */
+.board-cell.board-cell-bot-hit,
+.board-cell.board-cell-hit {
+  background: #d94a4a !important;
+  border-color: rgba(255, 210, 210, 0.9);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+.board-cell.board-cell-bot-miss,
+.board-cell.board-cell-miss {
+  background: rgba(230, 245, 255, 0.35) !important;
+}
+
+.board-cell.board-cell-sunk {
+  background: #7a1f1f !important;
+  border-color: rgba(255, 160, 160, 0.8);
+}
+
 /* --- Compact setup UI: icon toolbar + one-ship-at-a-time selector --- */
 
 .setup-controls {
@@ -1074,6 +1093,128 @@ button:hover {
 }
 
 
+
+
+/* --- Fleet roster, turn indicator, firing feedback --- */
+
+.fleet-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.roster-item-done { opacity: 0.35; }
+
+.roster-icon { display: inline-flex; }
+.roster-icon .ship-icon { width: 26px; height: 13px; }
+
+.roster-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.turn-indicator {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.turn-indicator-mine {
+  color: #0d2b18;
+  background: #5ede96;
+}
+
+.turn-indicator-theirs {
+  color: #f0d9d9;
+  background: rgba(180, 70, 70, 0.5);
+}
+
+/* Selected target cell — moved by tapping or with the arrow keys. */
+.board-cell-selected {
+  outline: 2px solid #ffe066;
+  outline-offset: -2px;
+  box-shadow: 0 0 10px rgba(255, 224, 102, 0.7);
+  z-index: 2;
+}
+
+.fire-button-off {
+  filter: grayscale(0.75);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Firing feedback: recoil, muzzle flash, screen shake, impact marks. */
+.cannon-recoil { animation: recoil 0.26s ease-out; }
+
+@keyframes recoil {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(12px) scale(0.97); }
+  100% { transform: translateY(0); }
+}
+
+.muzzle-flash {
+  position: fixed;
+  left: 96px;
+  bottom: 86px;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  z-index: 22;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, #fff8d0 0%, #ffc76b 35%, rgba(255, 140, 40, 0.5) 60%, transparent 72%);
+}
+
+.muzzle-flash-on { animation: flash 0.24s ease-out; }
+
+@keyframes flash {
+  0% { opacity: 0; transform: scale(0.4); }
+  25% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+
+.screen-shake { animation: shake 0.22s ease-in-out; }
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-5px, 3px); }
+  40% { transform: translate(5px, -3px); }
+  60% { transform: translate(-3px, -2px); }
+  80% { transform: translate(3px, 2px); }
+}
+
+.impact-hit { animation: impactHit 0.5s ease-out; }
+.impact-miss { animation: impactMiss 0.5s ease-out; }
+
+@keyframes impactHit {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 90, 60, 0.9); }
+  40% { transform: scale(1.5); box-shadow: 0 0 16px 8px rgba(255, 120, 60, 0.75); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 90, 60, 0); }
+}
+
+@keyframes impactMiss {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200, 235, 255, 0.8); }
+  40% { transform: scale(1.32); box-shadow: 0 0 12px 5px rgba(200, 235, 255, 0.6); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200, 235, 255, 0); }
+}
 
 /* --- Room creation, turn clock, enemy fleet status --- */
 
@@ -1237,7 +1378,7 @@ button:hover {
    cells the player actually fired at. */
 .board-cell-auto { opacity: 0.62; }
 
-/* --- Movement pad, colour palette, fire button, cannon --- */
+/* --- Movement pad, fire button, cannon --- */
 
 .move-pad {
   display: grid;
@@ -1274,44 +1415,6 @@ button:hover {
   background: rgba(77, 181, 255, 0.14);
   border-color: rgba(77, 181, 255, 0.35);
   color: var(--accent-strong);
-}
-
-.color-palette {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  min-height: 34px;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.palette-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--muted);
-  margin-right: 2px;
-}
-
-.palette-hint {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.palette-swatch {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.palette-swatch-on {
-  border-color: #ffffff;
-  transform: scale(1.12);
 }
 
 .selector-add {

@@ -37,15 +37,17 @@ function canPlace(coords, selfId = null) {
 
 // One default colour per hull type, so the fleet reads as distinct
 // vessels at a glance; the player can override any of them.
-const SHIP_COLORS = ['#4db5ff', '#ffd166', '#06d6a0', '#ef476f', '#c792ea', '#f78c6b', '#8ecae6', '#b5e48c'];
-const DEFAULT_COLOR_BY_TYPE = {
-  admiral: '#ffd166',
-  hospital: '#ef476f',
-  aircraft: '#06d6a0',
-  destroyer: '#4db5ff',
-  torpedo: '#f78c6b',
-  carrier: '#c792ea',
-  submarine: '#8ecae6',
+// Fixed identity per hull type. Chosen to stay legible against the light
+// blue sea and to be distinguishable from each other and from the red of
+// damage markers.
+const COLOR_BY_TYPE = {
+  admiral: '#e0a938',    // gold — flagship
+  hospital: '#e35d6a',   // red cross
+  aircraft: '#3fb98f',   // green — air wing
+  destroyer: '#4a90d9',  // navy blue
+  torpedo: '#e0854a',    // orange — fast attack
+  carrier: '#9b7fd4',    // purple — supply
+  submarine: '#5fb3c9',  // cyan — submerged
 };
 
 export function initPlacement() {
@@ -61,7 +63,7 @@ export function initPlacement() {
         coords: [],
         orientation: 'horizontal',
         dir: 1,
-        color: DEFAULT_COLOR_BY_TYPE[blueprint.type] || SHIP_COLORS[0],
+        color: COLOR_BY_TYPE[blueprint.type] || '#4a90d9',
       });
     }
   });
@@ -107,86 +109,71 @@ function unplacedShips() {
   return state.placement.ships.filter((s) => s.coords.length === 0);
 }
 
-// Keeps the selection pointing at a real, still-unplaced ship.
+// Selection always points at the next unplaced ship, in fleet order.
 function normalizeSelection() {
   const pending = unplacedShips();
-  if (pending.length === 0) {
-    state.selectedShipId = null;
-    return;
-  }
-  if (!pending.some((s) => s.id === state.selectedShipId)) {
-    state.selectedShipId = pending[0].id;
-  }
-}
-
-export function cycleSelection(step) {
-  const pending = unplacedShips();
-  if (pending.length === 0) return;
-  const idx = pending.findIndex((s) => s.id === state.selectedShipId);
-  const next = (idx + step + pending.length) % pending.length;
-  state.selectedShipId = pending[next].id;
-  renderInventory();
+  state.selectedShipId = pending.length ? pending[0].id : null;
 }
 
 export function renderInventory() {
-  renderColorPalette();
   if (!dom.shipSelector) return;
   normalizeSelection();
 
   const pending = unplacedShips();
   const total = state.placement.ships.length;
-  const placedCount = total - pending.length;
+  const placed = total - pending.length;
+
+  renderFleetRoster();
 
   if (pending.length === 0) {
     dom.shipSelector.innerHTML = `
       <div class="selector-done">
         <strong>Frota completa</strong>
-        <span>${total}/${total} navios posicionados — toque em Salvar</span>
+        <span>${total}/${total} navios na grade — toque em Salvar</span>
       </div>`;
     return;
   }
 
-  const ship = pending.find((s) => s.id === state.selectedShipId) || pending[0];
+  // The order is fixed: the player always deploys whatever comes next,
+  // so there is nothing to choose and no arrows to get lost in.
+  const ship = pending[0];
   const sameType = pending.filter((s) => s.type === ship.type).length;
 
   dom.shipSelector.innerHTML = `
-    <button type="button" class="selector-arrow" data-step="-1" aria-label="Navio anterior">‹</button>
     <div class="selector-body">
       <div class="selector-icon" style="color:${ship.color}">${getShipIconSvg(ship.type)}</div>
       <div class="selector-meta">
         <span class="selector-name">${getShipLabel(ship)}</span>
-        <span class="selector-count">${sameType > 1 ? `${sameType} restantes · ` : ''}${placedCount}/${total} na grade</span>
+        <span class="selector-count">${sameType > 1 ? `${sameType} deste tipo · ` : ''}${placed}/${total} na grade</span>
       </div>
     </div>
-    <button type="button" class="selector-arrow" data-step="1" aria-label="Próximo navio">›</button>
     <button type="button" class="selector-add" id="add-to-grid">Adicionar</button>`;
 
-  dom.shipSelector.querySelectorAll('.selector-arrow').forEach((btn) => {
-    btn.addEventListener('click', () => cycleSelection(Number(btn.dataset.step)));
-  });
   dom.shipSelector.querySelector('#add-to-grid')?.addEventListener('click', addSelectedToGrid);
 }
 
-// Palette for recolouring whichever ship is currently active on the grid.
-function renderColorPalette() {
-  if (!dom.colorPalette) return;
-  const ship = getActiveShip();
+// Roster of the whole fleet grouped by type, showing how many of each
+// still have to go on the board.
+function renderFleetRoster() {
+  if (!dom.fleetRoster) return;
 
-  if (!ship || ship.coords.length === 0) {
-    dom.colorPalette.innerHTML = '<span class="palette-hint">Toque num navio da grade para mudar a cor</span>';
-    return;
-  }
-
-  dom.colorPalette.innerHTML =
-    `<span class="palette-label">${getShipLabel(ship)}</span>` +
-    SHIP_COLORS.map(
-      (c) =>
-        `<button type="button" class="palette-swatch${c === ship.color ? ' palette-swatch-on' : ''}" data-color="${c}" style="background:${c}" aria-label="Cor ${c}"></button>`
-    ).join('');
-
-  dom.colorPalette.querySelectorAll('.palette-swatch').forEach((btn) => {
-    btn.addEventListener('click', () => setActiveColor(btn.dataset.color));
+  const byType = new Map();
+  state.placement.ships.forEach((ship) => {
+    const entry = byType.get(ship.type) || { type: ship.type, total: 0, left: 0, color: ship.color, label: getShipLabel(ship) };
+    entry.total += 1;
+    if (ship.coords.length === 0) entry.left += 1;
+    byType.set(ship.type, entry);
   });
+
+  dom.fleetRoster.innerHTML = [...byType.values()]
+    .map(
+      (e) => `
+      <div class="roster-item${e.left === 0 ? ' roster-item-done' : ''}" title="${e.label}">
+        <span class="roster-icon" style="color:${e.color}">${getShipIconSvg(e.type)}</span>
+        <span class="roster-count">${e.left}/${e.total}</span>
+      </div>`
+    )
+    .join('');
 }
 
 // --- Add-to-grid then nudge into position -------------------------------
@@ -303,19 +290,6 @@ export function rotateActive() {
 export function flipActive() {
   reorientActive(state.placingOrientation, state.placingDir === 1 ? -1 : 1);
 }
-
-export function setActiveColor(color) {
-  const ship = getActiveShip();
-  if (!ship) {
-    setSetupMessage('Selecione um navio na grade para trocar a cor.', true);
-    return;
-  }
-  ship.color = color;
-  renderPlacementToDOM();
-  renderInventory();
-}
-
-export { SHIP_COLORS };
 
 export function renderPlacementToDOM() {
   if (!dom.myGrid) return;
@@ -619,7 +593,11 @@ export function saveFleet() {
   });
 
   if (!allPlaced) {
-    setSetupMessage('Posicione todos os navios antes de salvar.', true);
+    const missing = state.placement.ships.filter((s) => s.coords.length === 0).length;
+    setSetupMessage(
+      `Faltam ${missing} ${missing === 1 ? 'navio' : 'navios'} para posicionar antes de salvar.`,
+      true
+    );
     return;
   }
 

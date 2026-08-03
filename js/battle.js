@@ -74,6 +74,7 @@ function processPlayerShot(cell) {
   const powerUpType = maybeActivatePowerUp(cellId, true);
   const { hit, sunk, ship } = applyShotToFleet(state.soloEnemyFleet, cellId);
 
+  playImpact(cell, hit);
   if (hit) {
     cell.classList.add('board-cell-hit');
     if (sunk && ship) {
@@ -132,6 +133,7 @@ function botTakeTurn() {
   state.botAI.recordResult(shotId, hit, sunk);
 
   if (cell) {
+    playImpact(cell, hit);
     if (hit) {
       cell.classList.add('board-cell-bot-hit');
       if (sunk) {
@@ -230,6 +232,77 @@ function findCellFromPoint(clientX, clientY) {
   return element?.closest('.board-cell') || null;
 }
 
+
+// --- Cell selection: move the reticle cell by cell, like a spreadsheet ---
+
+// Keeps a logical selected cell so the reticle can be walked with the
+// arrow keys instead of only chasing a pointer. Tapping a cell selects
+// it; firing acts on the selection.
+function setSelectedCell(cellId, { scroll = false } = {}) {
+  if (!cellId) return;
+  state.selectedCellId = cellId;
+
+  dom.enemyGrid?.querySelectorAll('.board-cell-selected').forEach((c) => c.classList.remove('board-cell-selected'));
+  const cell = getCellElement(dom.enemyGrid, cellId);
+  if (!cell) return;
+  cell.classList.add('board-cell-selected');
+
+  const rect = cell.getBoundingClientRect();
+  const gridRect = dom.enemyGrid.getBoundingClientRect();
+  state.lastReticleClientX = rect.left + rect.width / 2;
+  state.lastReticleClientY = rect.top + rect.height / 2;
+
+  if (dom.periscopeReticle) {
+    dom.periscopeReticle.style.left = `${rect.left - gridRect.left + rect.width / 2}px`;
+    dom.periscopeReticle.style.top = `${rect.top - gridRect.top + rect.height / 2}px`;
+    dom.periscopeReticle.style.transform = 'translate(-50%, -50%)';
+  }
+  updateCannonRotation(state.lastReticleClientX, state.lastReticleClientY);
+  setTargetBadge(cell.dataset.shot ? 'ALVO JÁ ATINGIDO' : 'ALVO TRAVADO');
+  if (scroll) cell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+export function moveSelection(dRow, dCol) {
+  if (state.battleMode !== 'targeting') return;
+  const current = state.selectedCellId || 1;
+  const { row, col } = cellIdToCoord(current);
+  const r = clamp(row + dRow, 0, GRID_SIZE - 1);
+  const c = clamp(col + dCol, 0, GRID_SIZE - 1);
+  setSelectedCell(coordToCellId(r, c), { scroll: true });
+}
+
+export function handleArrowKeys(event) {
+  const map = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  const delta = map[event.key];
+  if (!delta || state.battleMode !== 'targeting') return;
+  if (event.target.matches('input, textarea')) return;
+  event.preventDefault();
+  moveSelection(delta[0], delta[1]);
+}
+
+// Muzzle flash + recoil + screen shake, so a shot has weight.
+function playFireAnimation() {
+  dom.tacticalBoard?.classList.add('screen-shake');
+  setTimeout(() => dom.tacticalBoard?.classList.remove('screen-shake'), 220);
+
+  if (dom.cannon) {
+    dom.cannon.classList.add('cannon-recoil');
+    setTimeout(() => dom.cannon.classList.remove('cannon-recoil'), 260);
+  }
+  if (dom.muzzleFlash) {
+    dom.muzzleFlash.classList.remove('muzzle-flash-on');
+    void dom.muzzleFlash.offsetWidth; // restart the animation
+    dom.muzzleFlash.classList.add('muzzle-flash-on');
+  }
+}
+
+// Impact marker animation on the targeted cell.
+function playImpact(cell, hit) {
+  if (!cell) return;
+  cell.classList.add(hit ? 'impact-hit' : 'impact-miss');
+  setTimeout(() => cell.classList.remove('impact-hit', 'impact-miss'), 500);
+}
+
 // --- Firing ------------------------------------------------------------
 
 function sendFireCommand(cell) {
@@ -239,14 +312,14 @@ function sendFireCommand(cell) {
 
   cell.dataset.shot = 'true';
   state.canShoot = false;
+  playFireAnimation();
+  playShotSound();
 
   if (state.isSoloMode) {
-    playShotSound();
     processPlayerShot(cell);
     return;
   }
 
-  playShotSound();
   emitFireCannon(cell.dataset.cell);
 }
 
@@ -278,30 +351,42 @@ export function handleBoardTouchMove(event) {
   updateReticlePosition(touch.clientX, touch.clientY);
 }
 
+// A tap selects the cell; the FOGO button (or a second tap) fires. This
+// avoids losing a turn to a mis-tap and matches how the arrow keys work.
 export function handleBoardClick(event) {
   const targetCell = event.target.closest('.board-cell');
   if (!targetCell) return;
-  updateReticlePosition(event.clientX, event.clientY);
-  sendFireCommand(targetCell);
+
+  if (state.selectedCellId === targetCell.dataset.cell) {
+    sendFireCommand(targetCell);
+    return;
+  }
+  setSelectedCell(targetCell.dataset.cell);
 }
 
 export function handleBoardTouchStart(event) {
   if (!event.touches.length) return;
   event.preventDefault();
   const touch = event.touches[0];
-  updateReticlePosition(touch.clientX, touch.clientY);
-  sendFireCommand(findCellFromPoint(touch.clientX, touch.clientY));
+  const cell = findCellFromPoint(touch.clientX, touch.clientY);
+  if (!cell) return;
+
+  if (state.selectedCellId === cell.dataset.cell) {
+    sendFireCommand(cell);
+    return;
+  }
+  setSelectedCell(cell.dataset.cell);
 }
 
 // The dedicated FOGO button fires at wherever the reticle currently is,
 // so the player can aim with one thumb and fire with the other instead
 // of having to tap the exact target cell.
 export function handleFireButton() {
-  if (state.lastReticleClientX === null || state.lastReticleClientY === null) {
-    setBattleStatus('Mire no mapa inimigo antes de disparar.');
+  if (!state.selectedCellId) {
+    setBattleStatus('Toque numa casa inimiga para mirar antes de disparar.');
     return;
   }
-  sendFireCommand(findCellFromPoint(state.lastReticleClientX, state.lastReticleClientY));
+  sendFireCommand(getCellElement(dom.enemyGrid, state.selectedCellId));
 }
 
 export function handleSpacebar(event) {

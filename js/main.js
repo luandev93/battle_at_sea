@@ -26,6 +26,7 @@ import {
   handleBoardTouchMove,
   handleSpacebar,
   handleFireButton,
+  handleArrowKeys,
   handleOpponentFire,
   handleMatchFound,
   handleShotResult,
@@ -127,6 +128,7 @@ if (dom.enemyGrid) {
 
 dom.fireButton?.addEventListener('click', handleFireButton);
 document.addEventListener('keydown', handleSpacebar);
+document.addEventListener('keydown', handleArrowKeys);
 
 // --- multiplayer events ---------------------------------------------------------
 

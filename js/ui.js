@@ -81,6 +81,7 @@ export function showBattleScreen(mode = 'waiting') {
   if (dom.tacticalBoard) {
     dom.tacticalBoard.dataset.mode = mode;
   }
+  syncTurnIndicator(mode);
   pauseLoginVideo();
   startAmbientSound();
 }
@@ -89,6 +90,24 @@ export function setBattleMode(mode) {
   state.battleMode = mode;
   if (dom.tacticalBoard) {
     dom.tacticalBoard.dataset.mode = mode;
+  }
+  syncTurnIndicator(mode);
+}
+
+// The fire button used to look available at all times, so there was no
+// way to tell whose turn it was. Now it is genuinely disabled off-turn
+// and a banner states plainly who is playing.
+export function syncTurnIndicator(mode) {
+  const myTurn = mode === 'targeting';
+
+  if (dom.fireButton) {
+    dom.fireButton.disabled = !myTurn;
+    dom.fireButton.classList.toggle('fire-button-off', !myTurn);
+  }
+  if (dom.turnIndicator) {
+    dom.turnIndicator.textContent = myTurn ? 'SUA VEZ' : 'VEZ DO ADVERSÁRIO';
+    dom.turnIndicator.classList.toggle('turn-indicator-mine', myTurn);
+    dom.turnIndicator.classList.toggle('turn-indicator-theirs', !myTurn);
   }
 }
 
