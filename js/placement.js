@@ -2,11 +2,19 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { GRID_SIZE } from './utils.js';
-import { fleetBlueprints, getBlueprint, getShipLabel, getShipShortLabel } from './fleetBlueprints.js';
-import { coordsForPlacement } from './shipGeometry.js';
+import { GRID_SIZE, coordToCellId, cellIdToCoord } from './utils.js';
+import { fleetBlueprints, getBlueprint, getShipLabel } from './fleetBlueprints.js';
+import { coordsForPlacement, coordsForPlacementClamped, getPatternBounds, rotateAndFlipPattern } from './shipGeometry.js';
 import { fleetCanPlace, buildPlayerFleetFromPlacement } from './fleet.js';
-import { displayError } from './ui.js';
+import { getCellElement } from './board.js';
+import { displayError, setBattleStatus, showLobbyScreen } from './ui.js';
+
+let ghostEl = null;
+let dragShipId = null;
+let dragIsReposition = false;
+let dragOriginalCoords = null;
+let dragOriginalOrientation = null;
+let dragOriginalDir = null;
 
 function canPlace(coords) {
   return fleetCanPlace(state.placement, coords);
@@ -26,93 +34,267 @@ export function initPlacement() {
   state.placement = { grid, ships };
 }
 
-export function renderFleetGrid() {
-  if (!dom.fleetGrid) return;
-  dom.fleetGrid.innerHTML = '';
-  for (let i = 1; i <= GRID_SIZE * GRID_SIZE; i += 1) {
-    const cell = document.createElement('div');
-    cell.className = 'fleet-cell';
-    cell.dataset.cell = String(i);
-    cell.addEventListener('dragover', (e) => e.preventDefault());
-    cell.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const shipId = e.dataTransfer.getData('text/plain');
-      handlePlaceShipAtCell(shipId, cell.dataset.cell);
-    });
-    dom.fleetGrid.appendChild(cell);
+// --- rendering ---------------------------------------------------------
+
+// Builds a small grid of filled/empty squares that traces a ship's
+// actual silhouette (rotated to match the current placing orientation)
+// instead of showing a plain text label.
+function buildSilhouette(ship) {
+  const blueprint = getBlueprint(ship.type);
+  if (!blueprint) return document.createElement('div');
+
+  const pattern = rotateAndFlipPattern(blueprint.pattern, state.placingOrientation, state.placingDir);
+  const { rows, cols } = getPatternBounds(pattern);
+  const filled = new Set(pattern.map((c) => `${c.row},${c.col}`));
+
+  const el = document.createElement('div');
+  el.className = 'ship-silhouette';
+  el.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  el.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const cell = document.createElement('span');
+      cell.className = filled.has(`${r},${c}`) ? 'hull-cell' : 'hull-cell hull-cell-empty';
+      el.appendChild(cell);
+    }
   }
+  return el;
 }
 
 export function renderInventory() {
-  if (!dom.fleetInventory) return;
-  dom.fleetInventory.innerHTML = '';
+  if (!dom.shipInventory) return;
+  dom.shipInventory.innerHTML = '';
+
   state.placement.ships.forEach((ship) => {
-    const label = getShipLabel(ship);
-    const el = document.createElement('div');
-    el.className = `fleet-ship fleet-ship-${ship.type}`;
-    el.draggable = true;
-    el.dataset.shipId = ship.id;
-    el.innerHTML = `<strong>${label}</strong><span class="ship-size">${getBlueprint(ship.type)?.pattern.length || 0} peças</span>`;
-    el.addEventListener('dragstart', (ev) => {
-      ev.dataTransfer.setData('text/plain', ship.id);
-    });
-    dom.fleetInventory.appendChild(el);
+    const placed = ship.coords && ship.coords.length > 0;
+    const card = document.createElement('div');
+    card.className = `ship-card${placed ? ' ship-card-placed' : ''}`;
+    card.dataset.shipId = ship.id;
+
+    const silhouette = buildSilhouette(ship);
+    const label = document.createElement('span');
+    label.className = 'ship-card-label';
+    label.textContent = placed ? `${getShipLabel(ship)} ✓` : getShipLabel(ship);
+
+    card.appendChild(silhouette);
+    card.appendChild(label);
+    card.addEventListener('pointerdown', (event) => startDragFromInventory(event, ship.id));
+    dom.shipInventory.appendChild(card);
   });
 }
 
 export function renderPlacementToDOM() {
-  const cells = dom.fleetGrid?.querySelectorAll('.fleet-cell') || [];
+  if (!dom.myGrid) return;
+  const cells = dom.myGrid.querySelectorAll('.board-cell');
   cells.forEach((cell) => {
-    const id = Number(cell.dataset.cell);
-    const row = Math.floor((id - 1) / GRID_SIZE);
-    const col = (id - 1) % GRID_SIZE;
-    const occupant = state.placement.grid[row][col];
-    if (occupant) {
-      const ship = state.placement.ships.find((s) => s.id === occupant);
-      cell.classList.add('occupied');
-      cell.textContent = ship ? getShipShortLabel(ship) : 'X';
-    } else {
-      cell.classList.remove('occupied');
-      cell.textContent = '';
-    }
+    cell.classList.remove('board-cell-fleet', 'board-cell-fleet-preview', 'board-cell-fleet-invalid');
+  });
+
+  state.placement.ships.forEach((ship) => {
+    ship.coords.forEach(({ row, col }) => {
+      getCellElement(dom.myGrid, coordToCellId(row, col))?.classList.add('board-cell-fleet');
+    });
   });
 }
 
-function placeShip(shipId, coords, orientation) {
-  const ship = state.placement.ships.find((s) => s.id === shipId);
-  if (!ship) return false;
+// --- drag preview -------------------------------------------------------
 
-  ship.coords.forEach(({ row, col }) => {
-    state.placement.grid[row][col] = null;
+function createGhost() {
+  const el = document.createElement('div');
+  el.className = 'drag-ghost';
+  document.body.appendChild(el);
+  return el;
+}
+
+function positionGhost(clientX, clientY) {
+  if (!ghostEl) return;
+  ghostEl.style.left = `${clientX}px`;
+  ghostEl.style.top = `${clientY}px`;
+}
+
+function clearPreview() {
+  dom.myGrid?.querySelectorAll('.board-cell-fleet-preview, .board-cell-fleet-invalid').forEach((cell) => {
+    cell.classList.remove('board-cell-fleet-preview', 'board-cell-fleet-invalid');
   });
-  ship.coords = coords;
-  ship.orientation = orientation;
+}
+
+function showPreview(coords, valid) {
+  clearPreview();
   coords.forEach(({ row, col }) => {
-    state.placement.grid[row][col] = shipId;
+    const cell = getCellElement(dom.myGrid, coordToCellId(row, col));
+    cell?.classList.add(valid ? 'board-cell-fleet-preview' : 'board-cell-fleet-invalid');
   });
-  renderPlacementToDOM();
-  return true;
 }
 
-function handlePlaceShipAtCell(shipId, startCellId) {
+function findGridCellUnderPointer(clientX, clientY) {
+  const el = document.elementFromPoint(clientX, clientY);
+  const cell = el?.closest('.board-cell');
+  return cell && dom.myGrid?.contains(cell) ? cell : null;
+}
+
+// --- drag lifecycle -------------------------------------------------------
+
+function startDrag(shipId, clientX, clientY) {
+  dragShipId = shipId;
+  ghostEl = createGhost();
+  ghostEl.appendChild(buildSilhouette(state.placement.ships.find((s) => s.id === shipId)));
+  positionGhost(clientX, clientY);
+
+  window.addEventListener('pointermove', handleDragMove);
+  window.addEventListener('pointerup', handleDragEnd, { once: true });
+  window.addEventListener('pointercancel', handleDragCancel, { once: true });
+}
+
+function startDragFromInventory(event, shipId) {
+  event.preventDefault();
   const ship = state.placement.ships.find((s) => s.id === shipId);
   if (!ship) return;
 
-  const coords = coordsForPlacement(startCellId, ship, state.placingOrientation, state.placingDir);
-  if (!coords) {
-    displayError('Posição inválida (fora da grade)');
-    return;
-  }
-  if (!canPlace(coords)) {
-    displayError('Sobreposição detectada. Escolha outra posição.');
+  // The inventory keeps showing ships that are already on the board (as
+  // dimmed cards), so a card drag can be a *re-placement*. If we treated
+  // it as a fresh drop, the ship's previous cells would stay marked as
+  // occupied forever — a phantom hull that blocks placement and can never
+  // be cleared. So lift it off the grid first, exactly like a grid drag.
+  if (ship.coords.length > 0) {
+    startDragFromGrid(event, shipId);
     return;
   }
 
+  dragIsReposition = false;
+  dragOriginalCoords = null;
+  startDrag(shipId, event.clientX, event.clientY);
+}
+
+function startDragFromGrid(event, shipId) {
+  event.preventDefault();
+  const ship = state.placement.ships.find((s) => s.id === shipId);
+  if (!ship) return;
+
+  dragIsReposition = true;
+  dragOriginalCoords = ship.coords.slice();
+  dragOriginalOrientation = ship.orientation;
+  dragOriginalDir = ship.dir;
+
+  // temporarily lift the ship off the grid so overlap checks against
+  // itself don't false-positive while previewing the new spot
+  ship.coords.forEach(({ row, col }) => {
+    state.placement.grid[row][col] = null;
+  });
+  ship.coords = [];
+  renderPlacementToDOM();
+
+  startDrag(shipId, event.clientX, event.clientY);
+}
+
+function handleDragMove(event) {
+  positionGhost(event.clientX, event.clientY);
+  const cell = findGridCellUnderPointer(event.clientX, event.clientY);
+  if (!cell) {
+    clearPreview();
+    return;
+  }
+
+  const ship = state.placement.ships.find((s) => s.id === dragShipId);
+  const coords = coordsForPlacementClamped(cell.dataset.cell, ship, state.placingOrientation, state.placingDir);
+  if (!coords) {
+    clearPreview();
+    return;
+  }
+  showPreview(coords, canPlace(coords));
+}
+
+function commitPlacement(ship, coords) {
   ship.coords = coords;
   ship.orientation = state.placingOrientation;
   ship.dir = state.placingDir;
-  placeShip(shipId, coords, state.placingOrientation);
+  coords.forEach(({ row, col }) => {
+    state.placement.grid[row][col] = ship.id;
+  });
 }
+
+function restoreOriginalPosition(ship) {
+  if (!dragOriginalCoords) return;
+  ship.coords = dragOriginalCoords;
+  ship.orientation = dragOriginalOrientation;
+  ship.dir = dragOriginalDir;
+  ship.coords.forEach(({ row, col }) => {
+    state.placement.grid[row][col] = ship.id;
+  });
+}
+
+function stopDragListeners() {
+  window.removeEventListener('pointermove', handleDragMove);
+  window.removeEventListener('pointerup', handleDragEnd);
+  window.removeEventListener('pointercancel', handleDragCancel);
+}
+
+function handleDragEnd(event) {
+  stopDragListeners();
+  ghostEl?.remove();
+  ghostEl = null;
+  clearPreview();
+
+  const ship = state.placement.ships.find((s) => s.id === dragShipId);
+  const cell = findGridCellUnderPointer(event.clientX, event.clientY);
+
+  if (ship && cell) {
+    const coords = coordsForPlacementClamped(cell.dataset.cell, ship, state.placingOrientation, state.placingDir);
+    if (coords && canPlace(coords)) {
+      commitPlacement(ship, coords);
+    } else if (dragIsReposition) {
+      restoreOriginalPosition(ship);
+      displayError('Posição inválida. O navio voltou ao lugar anterior.');
+    }
+    // invalid drop of a fresh inventory ship: simply stays unplaced
+  } else if (ship && dragIsReposition) {
+    // dropped outside the grid: remove the ship (send back to inventory)
+    ship.coords = [];
+  }
+
+  dragShipId = null;
+  dragIsReposition = false;
+  dragOriginalCoords = null;
+  renderPlacementToDOM();
+  renderInventory();
+}
+
+// A gesture can be interrupted by the OS/browser (e.g. an incoming
+// notification) instead of ending in a clean pointerup. Treat that the
+// same as an invalid drop: put a repositioned ship back where it was.
+function handleDragCancel() {
+  stopDragListeners();
+  ghostEl?.remove();
+  ghostEl = null;
+  clearPreview();
+
+  const ship = state.placement.ships.find((s) => s.id === dragShipId);
+  if (ship && dragIsReposition) {
+    restoreOriginalPosition(ship);
+  }
+
+  dragShipId = null;
+  dragIsReposition = false;
+  dragOriginalCoords = null;
+  renderPlacementToDOM();
+  renderInventory();
+}
+
+// pointerdown on an already-placed ship's cell picks it up for repositioning.
+// Guarded so this only ever fires during fleet setup, never mid-battle
+// (the same #my-grid element is reused to show battle damage later).
+function handleGridPointerDown(event) {
+  if (dom.tacticalBoard?.dataset.mode !== 'setup') return;
+
+  const cell = event.target.closest('.board-cell');
+  if (!cell) return;
+  const { row, col } = cellIdToCoord(cell.dataset.cell);
+  const shipId = state.placement.grid[row][col];
+  if (!shipId) return;
+  startDragFromGrid(event, shipId);
+}
+
+// --- bulk actions -------------------------------------------------------
 
 export function clearPlacement() {
   state.placement.ships.forEach((s) => {
@@ -120,6 +302,7 @@ export function clearPlacement() {
   });
   state.placement.grid.forEach((row) => row.fill(null));
   renderPlacementToDOM();
+  renderInventory();
 }
 
 export function randomizePlacement() {
@@ -157,19 +340,20 @@ export function randomizePlacement() {
     }
   });
   renderPlacementToDOM();
-}
-
-export function openFleetModal() {
-  if (!dom.fleetModal) return;
-  dom.fleetModal.classList.remove('hidden');
-  initPlacement();
-  renderFleetGrid();
   renderInventory();
-  renderPlacementToDOM();
 }
 
-export function closeFleetModal() {
-  dom.fleetModal?.classList.add('hidden');
+// --- entering / leaving the setup screen ----------------------------------
+
+export function enterFleetSetup() {
+  // preserve an already-saved/loaded fleet if the player is just
+  // reviewing or tweaking it; only start from a blank grid the first time
+  if (!state.placement) {
+    initPlacement();
+  }
+  renderPlacementToDOM();
+  renderInventory();
+  setBattleStatus('Configure sua frota antes de entrar em combate.');
 }
 
 // Validates every ship has been placed, builds the runtime fleet used
@@ -191,14 +375,16 @@ export function saveFleet() {
     dom.fleetConfigStatus.textContent = 'Frota salva.';
   }
 
+  const goBack = () => showLobbyScreen();
+
   if (state.currentPlayerId) {
     setDoc(doc(db, 'users', state.currentPlayerId), { fleet: state.placement.ships }, { merge: true })
       .catch(() => {
         displayError('Não foi possível salvar a frota remotamente. Salvando localmente.');
       })
-      .finally(() => closeFleetModal());
+      .finally(goBack);
   } else {
-    closeFleetModal();
+    goBack();
   }
 }
 
@@ -226,7 +412,6 @@ export async function loadFleetFromFirestore(id) {
       });
     });
 
-    renderPlacementToDOM();
     state.fleetSaved = true;
     state.playerFleet = buildPlayerFleetFromPlacement(state.placement);
     if (dom.fleetConfigStatus) {
@@ -239,18 +424,22 @@ export async function loadFleetFromFirestore(id) {
   }
 }
 
-export function wireFleetModalControls() {
+export function wireFleetSetupControls() {
   dom.rotateShipButton?.addEventListener('click', () => {
     state.placingOrientation = state.placingOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+    renderInventory();
   });
 
   dom.flipShipButton?.addEventListener('click', () => {
     state.placingDir = state.placingDir === 1 ? -1 : 1;
+    renderInventory();
   });
 
   dom.clearGridButton?.addEventListener('click', () => clearPlacement());
   dom.randomizeGridButton?.addEventListener('click', () => randomizePlacement());
   dom.saveFleetButton?.addEventListener('click', () => saveFleet());
-  dom.closeFleetButton?.addEventListener('click', () => closeFleetModal());
-  dom.fleetConfigButton?.addEventListener('click', () => openFleetModal());
+
+  if (dom.myGrid) {
+    dom.myGrid.addEventListener('pointerdown', handleGridPointerDown);
+  }
 }

@@ -447,81 +447,6 @@ button:hover {
   display: none;
 }
 
-/* Fleet modal styles */
-.fleet-modal {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(0,0,0,0.6);
-  z-index: 30;
-}
-
-.fleet-modal-card {
-  width: min(980px, 96%);
-  background: rgba(6,16,26,0.98);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 18px;
-  padding: 16px;
-}
-
-.fleet-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.fleet-modal-body {
-  display: flex;
-  gap: 18px;
-}
-
-.fleet-inventory {
-  min-width: 220px;
-  display: grid;
-  gap: 12px;
-  align-content: start;
-}
-
-.fleet-ship {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
-  cursor: grab;
-  user-select: none;
-}
-
-.fleet-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
-  gap: 6px;
-  padding: 8px;
-  background: rgba(255,255,255,0.02);
-  border-radius: 12px;
-}
-
-.fleet-cell {
-  width: 100%;
-  height: 40px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.03);
-  border: 1px dashed rgba(255,255,255,0.04);
-}
-
-.fleet-cell.occupied {
-  background: rgba(77,181,255,0.18);
-  border-style: solid;
-}
-
-.fleet-modal.hidden {
-  display: none;
-}
-
 .lobby-panel {
   text-align: left;
 }
@@ -547,7 +472,12 @@ button:hover {
 
 .battle-shell {
   position: relative;
-  min-height: 620px;
+  width: min(100%, 900px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 28px;
   border-radius: 28px;
   background: radial-gradient(circle at center, rgba(32, 74, 118, 0.18), transparent 45%),
     linear-gradient(180deg, rgba(8, 17, 26, 0.95), rgba(7, 14, 21, 0.96));
@@ -560,6 +490,13 @@ button:hover {
   justify-content: space-between;
   gap: 18px;
   align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.battle-top-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .battle-metrics {
@@ -576,6 +513,49 @@ button:hover {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 22px;
   min-width: 320px;
+}
+
+.target-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+  background: rgba(77, 181, 255, 0.14);
+  border: 1px solid rgba(77, 181, 255, 0.3);
+}
+
+#tactical-board[data-mode="setup"] #ammo-counter,
+#tactical-board[data-mode="setup"] #target-badge {
+  display: none;
+}
+
+#tactical-board:not([data-mode="targeting"]) #target-badge {
+  opacity: 0.55;
+}
+
+.grid-block {
+  padding: 0 28px;
+  display: grid;
+  gap: 12px;
+}
+
+.grid-block-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.grid-block-title::before {
+  content: '▸ ';
+  color: var(--accent-strong);
 }
 
 .battle-substatus {
@@ -621,6 +601,10 @@ button:hover {
   border-radius: 32px;
 }
 
+.board-frame-mine {
+  padding: 16px;
+}
+
 .board-shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -653,10 +637,19 @@ button:hover {
   gap: 10px;
 }
 
-.board {
+/* Wraps the enemy grid so the periscope reticle and setup-lock overlay,
+   both absolutely positioned, line up pixel-for-pixel with the grid
+   itself rather than with the wider frame around it (which also
+   contains the row/column coordinate labels). */
+.board-wrap {
+  position: relative;
   width: min(100%, 740px);
-  aspect-ratio: 1 / 1;
   margin: 0 auto;
+}
+
+.board {
+  width: 100%;
+  aspect-ratio: 1 / 1;
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   grid-template-rows: repeat(10, 1fr);
@@ -672,6 +665,41 @@ button:hover {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: contain;
+}
+
+.board-mine {
+  width: min(100%, 380px);
+  margin: 0 auto;
+  gap: 4px;
+  padding: 8px;
+}
+
+.setup-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(3, 8, 15, 0.82);
+  backdrop-filter: blur(3px);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+#tactical-board[data-mode="setup"] .setup-lock-overlay {
+  display: flex;
+}
+
+/* During setup the enemy grid is dead weight: on a phone it pushed the
+   actual fleet builder a full screen down, so the first thing the player
+   saw after tapping "Configurar Frota" was a greyed-out board. Hide it
+   and let the setup panel own the screen. */
+#tactical-board[data-mode="setup"] .grid-block-enemy {
+  display: none;
 }
 
 .board-cell {
@@ -756,6 +784,23 @@ button:hover {
 .board-cell-sunk::after {
   background: linear-gradient(45deg, rgba(255, 255, 255, 0.25) 0%, transparent 36%),
     radial-gradient(circle, rgba(255, 225, 100, 0.6) 6px, transparent 9px);
+}
+
+/* "Meu Lado" grid: renders the player's own ship hulls */
+.board-cell-fleet {
+  background: rgba(120, 160, 200, 0.32) !important;
+  box-shadow: inset 0 0 0 1px rgba(190, 215, 235, 0.35);
+}
+
+/* live drag preview while placing/repositioning a ship */
+.board-cell-fleet-preview {
+  background: rgba(94, 222, 150, 0.4) !important;
+  box-shadow: inset 0 0 0 2px rgba(94, 222, 150, 0.75);
+}
+
+.board-cell-fleet-invalid {
+  background: rgba(255, 95, 122, 0.35) !important;
+  box-shadow: inset 0 0 0 2px rgba(255, 95, 122, 0.75);
 }
 
 .board::before,
@@ -859,12 +904,150 @@ button:hover {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
+/* Periscope HUD only comes alive once it's actually the player's turn */
+#periscope-reticle,
+#rustic-cannon {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#tactical-board[data-mode="targeting"] #periscope-reticle,
+#tactical-board[data-mode="targeting"] #rustic-cannon {
+  opacity: 1;
+}
+
+#tactical-board:not([data-mode="targeting"]) #enemy-grid {
+  pointer-events: none;
+}
+
+#tactical-board[data-mode="targeting"] #enemy-grid {
+  cursor: crosshair;
+}
+
+#tactical-board[data-mode="setup"] #enemy-grid-wrapper {
+  filter: saturate(0.4) brightness(0.7);
+}
+
 .hidden {
   display: none !important;
 }
 
 .lobby-screen.visible {
   display: grid;
+}
+
+/* --- Fleet setup: ship inventory + controls, only shown in setup mode --- */
+
+.setup-panel {
+  display: none;
+  padding: 0 28px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#tactical-board[data-mode="setup"] .setup-panel {
+  display: flex;
+}
+
+#tactical-board[data-mode="setup"] #back-to-lobby-button {
+  display: inline-flex;
+}
+
+#tactical-board:not([data-mode="setup"]) #back-to-lobby-button {
+  display: none;
+}
+
+#tactical-board[data-mode="setup"] #forfeit-button {
+  display: none;
+}
+
+#tactical-board:not([data-mode="setup"]) #forfeit-button {
+  display: inline-flex;
+}
+
+.setup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ship-inventory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+}
+
+.ship-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  min-width: 74px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.ship-card:active {
+  cursor: grabbing;
+}
+
+.ship-card-placed {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.ship-card-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ship-silhouette {
+  display: grid;
+  gap: 2px;
+}
+
+.hull-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #7f97ac 0%, #445468 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.hull-cell-empty {
+  background: transparent;
+  box-shadow: none;
+}
+
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(6, 16, 26, 0.9);
+  border: 1px solid rgba(77, 181, 255, 0.4);
+  display: grid;
+  gap: 2px;
+}
+
+.drag-ghost .hull-cell {
+  width: 16px;
+  height: 16px;
 }
 
 @media (max-width: 900px) {
@@ -890,6 +1073,10 @@ button:hover {
     align-items: stretch;
   }
 
+  .battle-top-actions {
+    justify-content: flex-end;
+  }
+
   .battle-metrics {
     width: 100%;
     justify-content: space-between;
@@ -897,6 +1084,11 @@ button:hover {
 
   .battle-status-panel {
     min-width: auto;
+  }
+
+  .grid-block,
+  .setup-panel {
+    padding: 0 18px;
   }
 
   .board-frame {
@@ -913,13 +1105,12 @@ button:hover {
   }
 
   .board {
-    width: 100%;
     padding: 10px;
     gap: 5px;
   }
 
-  .fleet-modal-card {
-    width: min(100%, 92vw);
+  .board-mine {
+    width: min(100%, 320px);
   }
 }
 
@@ -936,20 +1127,31 @@ button:hover {
   }
 
   .login-panel,
-  .lobby-panel,
-  .fleet-modal-card,
-  .battle-shell {
+  .lobby-panel {
     width: 100%;
     padding: 20px;
   }
 
+  .battle-shell {
+    width: 100%;
+    padding: 0 0 20px;
+  }
+
   .topbar,
-  .battle-top,
   .options-card,
-  .fleet-modal-body,
   .card,
   .battle-status-panel {
     padding: 16px;
+  }
+
+  .battle-top,
+  .grid-block,
+  .setup-panel {
+    padding: 0 16px;
+  }
+
+  .battle-top {
+    padding-top: 20px;
   }
 
   .board-frame {
@@ -971,9 +1173,12 @@ button:hover {
   }
 
   .board {
-    width: 100%;
     gap: 4px;
     padding: 8px;
+  }
+
+  .board-mine {
+    width: min(100%, 280px);
   }
 
   .board-cell {
@@ -987,6 +1192,16 @@ button:hover {
   .ammo-counter {
     width: 82px;
     height: 82px;
+  }
+
+  .ship-card {
+    min-width: 64px;
+    padding: 8px 10px;
+  }
+
+  .hull-cell {
+    width: 10px;
+    height: 10px;
   }
 }
 
@@ -1009,6 +1224,15 @@ button:hover {
     gap: 12px;
   }
 
+  .battle-top-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .battle-top-actions .secondary-button {
+    flex: 1;
+  }
+
   .battle-metrics {
     flex-wrap: wrap;
   }
@@ -1019,12 +1243,25 @@ button:hover {
 
   .button-row,
   .card-actions,
-  .fleet-controls {
+  .setup-controls {
     flex-direction: column;
+  }
+
+  .setup-controls .primary-button,
+  .setup-controls .secondary-button {
+    width: 100%;
   }
 
   .ammo-value {
     font-size: 1.7rem;
+  }
+
+  .board-mine {
+    width: min(100%, 240px);
+  }
+
+  .ship-inventory {
+    justify-content: center;
   }
 }
 

@@ -6,11 +6,19 @@ const TICK_MS = 100;
 
 export function resetAmmoDisplay() {
   if (dom.ammoValue) {
-    dom.ammoValue.textContent = 'Ready';
+    dom.ammoValue.textContent = 'Pronto';
   }
 }
 
 export function startReload() {
+  // A reload from a previous shot (or a previous match) may still be
+  // ticking. Without clearing it first the old interval keeps writing to
+  // the same display and will flip canShoot back on early.
+  if (state.reloadInterval) {
+    clearInterval(state.reloadInterval);
+    state.reloadInterval = null;
+  }
+
   let remaining = RELOAD_SECONDS;
   if (dom.ammoValue) {
     dom.ammoValue.textContent = remaining.toFixed(1);

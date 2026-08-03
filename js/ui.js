@@ -20,6 +20,12 @@ export function setBattleStatus(message) {
   }
 }
 
+export function setTargetBadge(text) {
+  if (dom.targetBadge) {
+    dom.targetBadge.textContent = text;
+  }
+}
+
 export function fillOnlinePlayers(players = []) {
   if (!dom.playerList) return;
   dom.playerList.innerHTML = players.length
@@ -61,14 +67,29 @@ export function showLobbyScreen() {
   playLobbyAudio();
 }
 
-export function showBattleScreen() {
+// `mode` is 'setup' | 'waiting' | 'targeting' and drives which parts of
+// the tactical board (ship inventory, periscope HUD, lock overlay...)
+// are visible, entirely through CSS attribute selectors on #tactical-board.
+export function showBattleScreen(mode = 'waiting') {
   state.currentScreen = 'battle';
+  state.battleMode = mode;
+  dom.loginScreen?.classList.add('hidden');
   dom.lobbyScreen?.classList.add('hidden');
   dom.lobbyScreen?.classList.remove('visible');
   dom.battleScreen?.classList.remove('hidden');
   dom.battleScreen?.classList.add('visible');
+  if (dom.tacticalBoard) {
+    dom.tacticalBoard.dataset.mode = mode;
+  }
   pauseLobbyAudio();
   startAmbientSound();
+}
+
+export function setBattleMode(mode) {
+  state.battleMode = mode;
+  if (dom.tacticalBoard) {
+    dom.tacticalBoard.dataset.mode = mode;
+  }
 }
 
 export function openOptions() {

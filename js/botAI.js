@@ -26,6 +26,13 @@ export class BotAI {
   }
 
   nextShot() {
+    // A queued neighbour can be picked off by a random hunt shot before
+    // the queue reaches it. Drop any stale entries, otherwise the bot
+    // burns a turn re-firing at a cell it already hit.
+    while (this.targetQueue.length > 0 && !this.availableShots.has(this.targetQueue[0])) {
+      this.targetQueue.shift();
+    }
+
     if (this.mode === 'target' && this.targetQueue.length > 0) {
       return this.targetQueue.shift();
     }

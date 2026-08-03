@@ -43,4 +43,7 @@ export const state = {
 
   // which screen is currently visible: 'login' | 'lobby' | 'battle'
   currentScreen: 'login',
+
+  // sub-mode within the battle screen: 'setup' | 'waiting' | 'targeting'
+  battleMode: 'setup',
 };

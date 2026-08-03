@@ -4,9 +4,9 @@ import { clamp, coordToCellId, cellIdToCoord } from './utils.js';
 import { createFleet, applyShotToFleet, isFleetSunk } from './fleet.js';
 import { BotAI } from './botAI.js';
 import { maybeActivatePowerUp, setupSoloPowerUps } from './powerups.js';
-import { markSunkShipCells, clearBoardShots, getCellElement } from './board.js';
-import { setBattleStatus, displayError, showBattleScreen } from './ui.js';
-import { startReload } from './ammo.js';
+import { markSunkShipCells, clearGridShots, getCellElement, renderFleetOnGrid } from './board.js';
+import { setBattleStatus, setTargetBadge, displayError, showBattleScreen, setBattleMode } from './ui.js';
+import { startReload, cancelReload } from './ammo.js';
 import { playShotSound, playEnemyShotSound } from './audio.js';
 import { awardPoints } from './stats.js';
 import { emitFireCannon, emitFireResponse, emitDeclineMatch, emitForfeitBattle } from './network.js';
@@ -25,10 +25,14 @@ export function startSoloMode() {
   setupSoloPowerUps();
 
   state.isPlayerTurn = true;
-  state.canShoot = true;
   state.extraShotActive = false;
-  clearBoardShots();
-  showBattleScreen();
+  cancelReload(); // a countdown from a previous match may still be ticking
+
+  clearGridShots(dom.enemyGrid);
+  clearGridShots(dom.myGrid);
+  renderFleetOnGrid(dom.myGrid, state.playerFleet);
+
+  showBattleScreen('targeting');
   setBattleStatus('Modo solo iniciado. Sua vez.');
 }
 
@@ -42,7 +46,7 @@ function processPlayerShot(cell) {
 
   if (hit) {
     cell.classList.add('board-cell-hit');
-    if (sunk && ship) markSunkShipCells(ship);
+    if (sunk && ship) markSunkShipCells(dom.enemyGrid, ship);
   } else {
     cell.classList.add('board-cell-miss');
   }
@@ -56,11 +60,13 @@ function processPlayerShot(cell) {
 
   if (hit && sunk && isFleetSunk(state.soloEnemyFleet)) {
     setBattleStatus('Você derrotou o bot!');
+    setBattleMode('waiting');
     awardPoints(1, 'solo_win');
     return;
   }
 
   state.isPlayerTurn = false;
+  setBattleMode('waiting');
   setTimeout(() => botTakeTurn(), 700);
 }
 
@@ -68,9 +74,16 @@ function botTakeTurn() {
   if (!state.playerFleet || !state.botAI) return;
 
   const shotId = state.botAI.nextShot();
-  if (!shotId) return;
+  // No cells left to fire at. Hand the turn back instead of returning
+  // early, which used to leave the board frozen in 'waiting' forever.
+  if (!shotId) {
+    setBattleStatus('O bot não tem mais alvos. Sua vez.');
+    state.isPlayerTurn = true;
+    setBattleMode('targeting');
+    return;
+  }
 
-  const cell = getCellElement(shotId);
+  const cell = getCellElement(dom.myGrid, shotId);
   if (cell) cell.dataset.shot = 'true';
 
   try {
@@ -89,7 +102,7 @@ function botTakeTurn() {
       if (sunk) {
         const { row, col } = cellIdToCoord(shotId);
         const ship = state.playerFleet.grid[row][col];
-        if (ship) markSunkShipCells(ship);
+        if (ship) markSunkShipCells(dom.myGrid, ship);
       }
     } else {
       cell.classList.add('board-cell-bot-miss');
@@ -98,11 +111,13 @@ function botTakeTurn() {
 
   if (hit && sunk && isFleetSunk(state.playerFleet)) {
     setBattleStatus('O bot venceu!');
+    setBattleMode('waiting');
     return;
   }
 
   setBattleStatus(hit ? 'O bot acertou! Sua vez.' : 'O bot errou. Agora é sua vez.');
   state.isPlayerTurn = true;
+  setBattleMode('targeting');
 }
 
 // --- Aiming (periscope reticle + cannon) ------------------------------
@@ -116,10 +131,20 @@ function updateCannonRotation(reticleX, reticleY) {
   dom.cannon.style.transform = `translateX(-50%) rotate(${angle}deg)`;
 }
 
-function updateReticlePosition(clientX, clientY) {
-  if (!dom.board || !dom.periscopeReticle) return;
+function updateTargetBadge(clientX, clientY) {
+  if (state.battleMode !== 'targeting') return;
+  const cell = document.elementFromPoint(clientX, clientY)?.closest('.board-cell');
+  if (!cell || !dom.enemyGrid?.contains(cell)) {
+    setTargetBadge('SALVA PRONTA');
+    return;
+  }
+  setTargetBadge(cell.dataset.shot ? 'ALVO JÁ ATINGIDO' : 'ALVO TRAVADO');
+}
 
-  const bounds = dom.board.getBoundingClientRect();
+function updateReticlePosition(clientX, clientY) {
+  if (!dom.enemyGrid || !dom.periscopeReticle) return;
+
+  const bounds = dom.enemyGrid.getBoundingClientRect();
   const x = clamp(clientX - bounds.left, 0, bounds.width);
   const y = clamp(clientY - bounds.top, 0, bounds.height);
 
@@ -130,6 +155,7 @@ function updateReticlePosition(clientX, clientY) {
   dom.periscopeReticle.style.top = `${y}px`;
   dom.periscopeReticle.style.transform = 'translate(-50%, -50%)';
   updateCannonRotation(state.lastReticleClientX, state.lastReticleClientY);
+  updateTargetBadge(clientX, clientY);
 }
 
 function findCellFromPoint(clientX, clientY) {
@@ -141,6 +167,7 @@ function findCellFromPoint(clientX, clientY) {
 
 function sendFireCommand(cell) {
   if (!state.canShoot || !state.isPlayerTurn || !cell) return;
+  if (state.battleMode !== 'targeting') return;
   if (cell.dataset.shot) return;
 
   cell.dataset.shot = 'true';
@@ -163,11 +190,13 @@ export function handleForfeit() {
 
   if (state.isSoloMode) {
     setBattleStatus('Você desistiu. Vitória por W.O. do bot.');
+    setBattleMode('waiting');
     return;
   }
 
   emitForfeitBattle();
   setBattleStatus('Você desistiu. Vitória por W.O. concedida ao adversário.');
+  setBattleMode('waiting');
 }
 
 // --- Board input handlers (wired in main.js) ----------------------------
@@ -208,7 +237,7 @@ export function handleSpacebar(event) {
 // --- Multiplayer socket reactions (wired in main.js) ---------------------
 
 export function handleOpponentFire({ cell, shooterIndex }) {
-  const cellEl = getCellElement(cell);
+  const cellEl = getCellElement(dom.myGrid, cell);
   let hit = false;
   let sunk = false;
   let defeated = false;
@@ -228,7 +257,7 @@ export function handleOpponentFire({ cell, shooterIndex }) {
     cellEl.dataset.shot = 'true';
     if (hit) {
       cellEl.classList.add('board-cell-bot-hit');
-      if (sunk && ship) markSunkShipCells(ship);
+      if (sunk && ship) markSunkShipCells(dom.myGrid, ship);
     } else {
       cellEl.classList.add('board-cell-miss');
     }
@@ -249,11 +278,20 @@ export function handleMatchFound({ playerIndex, isPlayerTurn }) {
 
   if (!state.fleetSaved) {
     emitDeclineMatch();
+    // The player is still on the lobby here, so the battle-screen status
+    // element is invisible. Report it somewhere they can actually see.
+    if (dom.fleetConfigStatus) {
+      dom.fleetConfigStatus.textContent = 'Partida recusada: configure e salve sua frota para batalhar.';
+    }
     setBattleStatus('Partida recusada: salve sua frota antes de batalhar.');
     return;
   }
 
-  showBattleScreen();
+  clearGridShots(dom.enemyGrid);
+  clearGridShots(dom.myGrid);
+  renderFleetOnGrid(dom.myGrid, state.playerFleet);
+
+  showBattleScreen(isPlayerTurn ? 'targeting' : 'waiting');
   setBattleStatus(
     isPlayerTurn ? 'Partida online iniciada. Sua vez.' : 'Partida online iniciada. Aguarde o turno do adversário.'
   );
@@ -261,26 +299,30 @@ export function handleMatchFound({ playerIndex, isPlayerTurn }) {
 
 export function handleShotResult(payload) {
   const { cell, shooterIndex, nextTurn, hit, sunk, defeated, winner } = payload;
-  const targetCell = getCellElement(cell);
   const isShooter = state.playerIndex === shooterIndex;
 
-  if (targetCell) {
-    if (typeof hit !== 'undefined') {
-      targetCell.classList.add(isShooter ? (hit ? 'board-cell-hit' : 'board-cell-miss') : hit ? 'board-cell-fleet-hit' : 'board-cell-miss');
-
-      if (sunk) {
-        setBattleStatus(isShooter ? 'Você afundou um navio!' : 'Seu navio foi afundado!');
-        targetCell.classList.add('board-cell-sunk');
-      }
-      if (defeated) {
-        setBattleStatus(winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
-      }
-    } else {
-      targetCell.classList.add('board-cell-miss');
+  // Only the shooter paints anything here. The defender already resolved
+  // and drew this exact shot locally in handleOpponentFire; painting it
+  // again from the broadcast just stacked a second, conflicting class on
+  // the same cell.
+  if (isShooter) {
+    const targetCell = getCellElement(dom.enemyGrid, cell);
+    if (targetCell) {
+      targetCell.classList.add(hit ? 'board-cell-hit' : 'board-cell-miss');
+      if (sunk) targetCell.classList.add('board-cell-sunk');
     }
   }
 
+  if (sunk) {
+    setBattleStatus(isShooter ? 'Você afundou um navio!' : 'Seu navio foi afundado!');
+  }
+  if (defeated) {
+    setBattleStatus(winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
+    if (winner === state.playerIndex) awardPoints(3, 'pvp_win');
+  }
+
   state.isPlayerTurn = state.playerIndex === nextTurn;
+  setBattleMode(defeated ? 'waiting' : state.isPlayerTurn ? 'targeting' : 'waiting');
 }
 
 export function handleBattleForfeit({ winner }) {
@@ -291,6 +333,7 @@ export function handleBattleForfeit({ winner }) {
     setBattleStatus('Sua equipe perdeu por W.O..');
   }
   state.isPlayerTurn = false;
+  setBattleMode('waiting');
 }
 
 export function handleWaitingForOpponent() {
@@ -301,4 +344,5 @@ export function handleOpponentLeft() {
   displayError('Oponente desconectado. Aguarde novo adversário.');
   setBattleStatus('Oponente saiu. Retornando ao lobby em breve...');
   state.isPlayerTurn = false;
+  setBattleMode('waiting');
 }

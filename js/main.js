@@ -1,12 +1,12 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { generateBoardCells } from './board.js';
+import { generateGridCells, generateGridCoords } from './board.js';
 import { resetAmmoDisplay } from './ammo.js';
 import { toggleAudioMuted } from './audio.js';
-import { openOptions, closeOptions, fillOnlinePlayers, fillPlayerHistory } from './ui.js';
+import { openOptions, closeOptions, fillOnlinePlayers, fillPlayerHistory, showBattleScreen, showLobbyScreen } from './ui.js';
 import { setPowerUpsEnabled } from './powerups.js';
 import { socket } from './network.js';
-import { wireFleetModalControls } from './placement.js';
+import { wireFleetSetupControls, enterFleetSetup } from './placement.js';
 import {
   handleSignIn,
   handleSignUp,
@@ -33,9 +33,12 @@ import {
 
 // --- initial render -----------------------------------------------------
 
-generateBoardCells();
+generateGridCells(dom.enemyGrid);
+generateGridCells(dom.myGrid);
+generateGridCoords(dom.enemyColLabels, dom.enemyRowLabels);
+generateGridCoords(dom.myColLabels, dom.myRowLabels);
 resetAmmoDisplay();
-wireFleetModalControls();
+wireFleetSetupControls();
 
 // --- login screen ---------------------------------------------------------
 
@@ -68,15 +71,21 @@ dom.closeOptionsButton?.addEventListener('click', closeOptions);
 dom.powerUpToggle?.addEventListener('change', (event) => setPowerUpsEnabled(event.target.checked));
 dom.viewHistoryButton?.addEventListener('click', () => fillPlayerHistory());
 
+dom.fleetConfigButton?.addEventListener('click', () => {
+  enterFleetSetup();
+  showBattleScreen('setup');
+});
+
 // --- battle screen ------------------------------------------------------------
 
 dom.forfeitButton?.addEventListener('click', handleForfeit);
+dom.backToLobbyButton?.addEventListener('click', () => showLobbyScreen());
 
-if (dom.board) {
-  dom.board.addEventListener('mousemove', handleBoardPointerMove);
-  dom.board.addEventListener('click', handleBoardClick);
-  dom.board.addEventListener('touchstart', handleBoardTouchStart, { passive: false });
-  dom.board.addEventListener('touchmove', handleBoardTouchMove, { passive: false });
+if (dom.enemyGrid) {
+  dom.enemyGrid.addEventListener('mousemove', handleBoardPointerMove);
+  dom.enemyGrid.addEventListener('click', handleBoardClick);
+  dom.enemyGrid.addEventListener('touchstart', handleBoardTouchStart, { passive: false });
+  dom.enemyGrid.addEventListener('touchmove', handleBoardTouchMove, { passive: false });
 }
 
 document.addEventListener('keydown', handleSpacebar);

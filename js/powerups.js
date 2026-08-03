@@ -1,6 +1,6 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { shuffle } from './utils.js';
+import { shuffle, coordToCellId } from './utils.js';
 import { getWaterCells, fleetCanPlace } from './fleet.js';
 import { coordsForPlacement } from './shipGeometry.js';
 import { getBlueprint } from './fleetBlueprints.js';
@@ -30,7 +30,8 @@ export function setPowerUpsEnabled(value) {
   if (!state.powerUpsEnabled) {
     state.playerPowerUps.clear();
     state.enemyPowerUps.clear();
-    clearPowerUpMarkers();
+    clearPowerUpMarkers(dom.enemyGrid);
+    clearPowerUpMarkers(dom.myGrid);
   }
   if (dom.powerUpToggle) {
     dom.powerUpToggle.checked = state.powerUpsEnabled;
@@ -39,7 +40,8 @@ export function setPowerUpsEnabled(value) {
 
 export function setupSoloPowerUps() {
   if (!state.playerFleet || !state.soloEnemyFleet) return;
-  clearPowerUpMarkers();
+  clearPowerUpMarkers(dom.enemyGrid);
+  clearPowerUpMarkers(dom.myGrid);
   if (!state.powerUpsEnabled) {
     state.playerPowerUps.clear();
     state.enemyPowerUps.clear();
@@ -56,7 +58,7 @@ function revivePlayerShip() {
 
   damagedShip.hits.clear();
   damagedShip.coords.forEach(({ row, col }) => {
-    const cell = getCellElement(row * 10 + col + 1);
+    const cell = getCellElement(dom.myGrid, coordToCellId(row, col));
     cell?.classList.remove('board-cell-sunk', 'board-cell-fleet-hit', 'board-cell-bot-hit');
   });
   return true;
@@ -103,6 +105,9 @@ function repositionPlayerShip() {
     newCoords.forEach(({ row, col }) => {
       fleet.grid[row][col] = ship;
     });
+
+    // refresh the visual: clear old damage marks, redraw the ship in its new spot
+    getCellElement(dom.myGrid, coordToCellId(newCoords[0].row, newCoords[0].col));
     return true;
   }
   return false;
@@ -144,8 +149,9 @@ export function activatePowerUp(type) {
   }
 }
 
-// `triggeredByPlayer` picks which side's power-up map is checked: the
-// player reveals power-ups hidden in the *enemy's* water, and vice versa.
+// `triggeredByPlayer` picks which side's power-up map is checked (the
+// player reveals power-ups hidden in the *enemy's* water, and vice
+// versa) and therefore which grid the reveal is drawn on.
 export function maybeActivatePowerUp(cellId, triggeredByPlayer) {
   if (!state.powerUpsEnabled) return null;
 
@@ -154,7 +160,7 @@ export function maybeActivatePowerUp(cellId, triggeredByPlayer) {
 
   const type = sourceMap.get(cellId);
   sourceMap.delete(cellId);
-  markPowerUpCell(cellId);
+  markPowerUpCell(triggeredByPlayer ? dom.enemyGrid : dom.myGrid, cellId);
   activatePowerUp(type);
   return type;
 }
