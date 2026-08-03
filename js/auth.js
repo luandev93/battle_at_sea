@@ -9,7 +9,8 @@ import {
   sendPasswordResetEmail,
   signOut,
 } from 'firebase/auth';
-import { auth } from './firebase-config.js';
+import { auth, db } from './firebase-config.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { dom } from './dom.js';
 import { state } from './state.js';
 import { displayError, clearError, fillPlayerHistory, showLobbyScreen, showLoginScreen, setBattleStatus } from './ui.js';
@@ -74,6 +75,57 @@ export function restoreRememberPreference() {
 
 // Everything that has to happen once a user is known to be signed in,
 // whether they just typed their password or the session was restored.
+// The commander name is chosen once and then locked: it is only written
+// if the profile document has no name yet.
+export async function ensureProfileName(uid, fallback) {
+  try {
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    const existing = snap.exists() ? snap.data().profileName : null;
+    if (existing) {
+      state.profileName = existing;
+      if (dom.playerName) dom.playerName.textContent = existing;
+      return existing;
+    }
+  } catch (e) {
+    // offline: fall through and ask for a name
+  }
+  promptForName(uid, fallback);
+  return null;
+}
+
+function promptForName(uid, fallback) {
+  if (!dom.namePanel) return;
+  dom.namePanel.classList.remove('hidden');
+  if (dom.profileNameInput) dom.profileNameInput.value = '';
+
+  const submit = async () => {
+    const value = (dom.profileNameInput?.value || '').trim();
+    if (value.length < 3 || value.length > 18) {
+      if (dom.profileNameError) dom.profileNameError.textContent = 'Use entre 3 e 18 caracteres.';
+      return;
+    }
+    if (!/^[\w\u00C0-\u017F ]+$/.test(value)) {
+      if (dom.profileNameError) dom.profileNameError.textContent = 'Use apenas letras, números e espaços.';
+      return;
+    }
+    if (dom.profileNameError) dom.profileNameError.textContent = '';
+
+    state.profileName = value;
+    if (dom.playerName) dom.playerName.textContent = value;
+    dom.namePanel.classList.add('hidden');
+    dom.confirmNameButton?.removeEventListener('click', submit);
+
+    try {
+      await setDoc(doc(db, 'users', uid), { profileName: value }, { merge: true });
+    } catch (e) {
+      // kept locally for this session if the write fails
+    }
+  };
+
+  dom.confirmNameButton?.addEventListener('click', submit);
+}
+
 function enterLobbyAsUser(user) {
   const playerLabel = user.email || 'Capitão';
   if (dom.playerName) dom.playerName.textContent = playerLabel;
@@ -81,6 +133,7 @@ function enterLobbyAsUser(user) {
 
   state.currentPlayerId = user.uid || user.email || playerLabel;
   updateStatsUI(state.currentPlayerId);
+  ensureProfileName(state.currentPlayerId, playerLabel);
 
   loadFleetFromFirestore(state.currentPlayerId).catch(() => {});
   loadStatsFromFirestore(state.currentPlayerId)

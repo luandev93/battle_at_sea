@@ -1095,6 +1095,193 @@ button:hover {
 
 
 
+
+/* ============ Modais, resultado e acabamento de menu ============ */
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 7, 13, 0.86);
+  backdrop-filter: blur(6px);
+  animation: scrimIn 0.22s ease-out;
+}
+
+.modal-scrim.hidden { display: none; }
+
+@keyframes scrimIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-card {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 26px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(77, 181, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, #0e2032 0%, #081521 100%);
+  border: 1px solid rgba(140, 190, 230, 0.28);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  animation: cardIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.modal-note {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.modal-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 1rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(140, 190, 230, 0.3);
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px rgba(77, 181, 255, 0.2);
+}
+
+.modal-error {
+  margin: 0;
+  min-height: 18px;
+  font-size: 0.78rem;
+  color: #ffb4b4;
+}
+
+.modal-action { width: 100%; }
+
+.result-card { text-align: center; }
+
+.result-title {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.result-win {
+  color: #6fe0a0;
+  text-shadow: 0 0 26px rgba(111, 224, 160, 0.55);
+}
+
+.result-loss {
+  color: #ff8a8a;
+  text-shadow: 0 0 26px rgba(255, 138, 138, 0.45);
+}
+
+.result-actions {
+  display: grid;
+  gap: 10px;
+}
+
+/* Power-up banner */
+.powerup-banner {
+  position: fixed;
+  left: 50%;
+  top: 14%;
+  z-index: 55;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 14px 26px;
+  border-radius: 18px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -14px);
+  background: linear-gradient(180deg, rgba(24, 60, 92, 0.97), rgba(12, 32, 52, 0.97));
+  border: 1px solid rgba(120, 210, 255, 0.55);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.6);
+}
+
+.powerup-banner strong {
+  font-size: 1rem;
+  color: #7fd8ff;
+  letter-spacing: 0.04em;
+}
+
+.powerup-banner span {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.powerup-banner-on { animation: bannerPop 2.6s ease-out; }
+
+@keyframes bannerPop {
+  0% { opacity: 0; transform: translate(-50%, -20px) scale(0.9); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(0.98); }
+}
+
+/* Menu polish: give panels depth instead of flat boxes */
+.room-card,
+.options-card {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(77, 181, 255, 0.14), transparent 62%),
+    linear-gradient(180deg, #0e2032 0%, #081521 100%);
+  border: 1px solid rgba(140, 190, 230, 0.26);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.room-header h4,
+.options-header h4 {
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+}
+
+.room-label {
+  color: rgba(150, 200, 235, 0.85);
+}
+
+.room-option {
+  transition: transform 0.14s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.room-option:active { transform: scale(0.97); }
+
+.room-option-on {
+  box-shadow: 0 0 0 1px rgba(77, 181, 255, 0.4), 0 6px 18px rgba(20, 90, 150, 0.35);
+}
+
+.primary-button {
+  background: linear-gradient(180deg, #57bcff 0%, #2f8fd6 100%);
+  border: 1px solid rgba(160, 220, 255, 0.5);
+  box-shadow: 0 8px 22px rgba(24, 110, 180, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 0.14s ease, filter 0.18s ease;
+}
+
+.primary-button:active { transform: scale(0.97); filter: brightness(1.08); }
+
+.secondary-button {
+  transition: transform 0.14s ease, background-color 0.18s ease;
+}
+
+.secondary-button:active { transform: scale(0.97); }
+
 /* --- Fleet roster, turn indicator, firing feedback --- */
 
 .fleet-roster {

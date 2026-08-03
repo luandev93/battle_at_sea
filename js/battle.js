@@ -7,7 +7,7 @@ import { maybeActivatePowerUp, setupSoloPowerUps } from './powerups.js';
 import { markSunkShipCells, clearGridShots, getCellElement, renderFleetOnGrid } from './board.js';
 import { setBattleStatus, setTargetBadge, displayError, showBattleScreen, setBattleMode } from './ui.js';
 import { startTurnClock, stopTurnClock, setTurnExpiryHandler } from './turnClock.js';
-import { chainsOnHit } from './matchConfig.js';
+import { chainsOnHit, firesOnTap } from './matchConfig.js';
 import { getShipIconSvg } from './shipIcons.js';
 import { getShipLabel } from './fleetBlueprints.js';
 import { revealWaterAroundShip } from './fleet.js';
@@ -33,12 +33,31 @@ function endPlayerTurn(message) {
   stopTurnClock();
 }
 
-function finishMatch(message) {
+function finishMatch(message, won = null) {
   state.isPlayerTurn = false;
   state.canShoot = false;
   setBattleMode('waiting');
   setBattleStatus(message);
   stopTurnClock();
+  showMatchResult(message, won);
+}
+
+// The board used to just freeze once a side was wiped out, with no way
+// forward. This presents the outcome and the ways out of it.
+function showMatchResult(message, won) {
+  const panel = dom.resultPanel;
+  if (!panel) return;
+
+  if (dom.resultTitle) {
+    dom.resultTitle.textContent = won === true ? 'VITÓRIA' : won === false ? 'DERROTA' : 'FIM DE PARTIDA';
+    dom.resultTitle.className = `result-title${won === true ? ' result-win' : won === false ? ' result-loss' : ''}`;
+  }
+  if (dom.resultMessage) dom.resultMessage.textContent = message;
+  panel.classList.remove('hidden');
+}
+
+export function hideMatchResult() {
+  dom.resultPanel?.classList.add('hidden');
 }
 
 // --- Solo mode -------------------------------------------------------
@@ -88,7 +107,7 @@ function processPlayerShot(cell) {
   }
 
   if (hit && sunk && isFleetSunk(state.soloEnemyFleet)) {
-    finishMatch('Você derrotou o bot!');
+    finishMatch('Sua frota dominou o mar. O adversário foi ao fundo.', true);
     awardPoints(1, 'solo_win');
     return;
   }
@@ -148,7 +167,7 @@ function botTakeTurn() {
   }
 
   if (hit && sunk && isFleetSunk(state.playerFleet)) {
-    finishMatch('O bot venceu!');
+    finishMatch('Sua frota foi afundada. O adversário venceu.', false);
     return;
   }
 
@@ -329,8 +348,7 @@ export function handleForfeit() {
   if (!confirmed) return;
 
   if (state.isSoloMode) {
-    setBattleStatus('Você desistiu. Vitória por W.O. do bot.');
-    setBattleMode('waiting');
+    finishMatch('Você desistiu do combate.', false);
     return;
   }
 
@@ -359,7 +377,7 @@ export function handleBoardClick(event) {
   const targetCell = event.target.closest('.board-cell');
   if (!targetCell) return;
   setSelectedCell(targetCell.dataset.cell);
-  sendFireCommand(targetCell);
+  if (firesOnTap()) sendFireCommand(targetCell);
 }
 
 export function handleBoardTouchStart(event) {
@@ -368,7 +386,7 @@ export function handleBoardTouchStart(event) {
   const cell = findCellFromPoint(event.touches[0].clientX, event.touches[0].clientY);
   if (!cell) return;
   setSelectedCell(cell.dataset.cell);
-  sendFireCommand(cell);
+  if (firesOnTap()) sendFireCommand(cell);
 }
 
 // The dedicated FOGO button fires at wherever the reticle currently is,
@@ -490,7 +508,10 @@ export function handleShotResult(payload) {
   }
 
   if (defeated) {
-    finishMatch(winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
+    finishMatch(
+      winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.',
+      winner === state.playerIndex
+    );
     return;
   }
 

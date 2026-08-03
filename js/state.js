@@ -35,6 +35,7 @@ export const state = {
 
   // player / progression
   currentPlayerId: null,
+  profileName: null, // chosen once at first login, then immutable
 
   // fleet placement (configuration modal)
   fleetSaved: false,

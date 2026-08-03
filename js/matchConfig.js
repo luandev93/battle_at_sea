@@ -23,7 +23,13 @@ export const TURN_CLOCKS = {
   blitz: { seconds: 10, label: '10s por jogada', description: 'Decisão instantânea.' },
 };
 
+export const FIRE_MODES = {
+  toque: { label: 'Toque direto', description: 'Toca na casa e dispara.' },
+  botao: { label: 'Mirar e confirmar', description: 'Seleciona a casa e usa o botão FOGO.' },
+};
+
 export const matchConfig = {
+  fireMode: 'toque',
   map: 'padrao',
   turnRule: 'encadeado',
   turnClock: 'livre',
@@ -37,6 +43,10 @@ export function getMapSize() {
 
 export function getTurnSeconds() {
   return TURN_CLOCKS[matchConfig.turnClock]?.seconds ?? 0;
+}
+
+export function firesOnTap() {
+  return matchConfig.fireMode === 'toque';
 }
 
 export function chainsOnHit() {

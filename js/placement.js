@@ -603,6 +603,7 @@ export function saveFleet() {
 
   state.playerFleet = buildPlayerFleetFromPlacement(state.placement);
   state.fleetSaved = true;
+  setSetupMessage('✓ Frota salva com sucesso! Pronta para o combate.');
   if (dom.fleetConfigStatus) {
     dom.fleetConfigStatus.textContent = 'Frota salva.';
   }

@@ -27,6 +27,7 @@ import {
   handleSpacebar,
   handleFireButton,
   handleArrowKeys,
+  hideMatchResult,
   handleOpponentFire,
   handleMatchFound,
   handleShotResult,
@@ -135,6 +136,7 @@ dom.startMatchButton?.addEventListener('click', () => {
   setPowerUpsEnabled(matchConfig.powerUps);
   rebuildBoards();
   dom.roomPanel?.classList.add('hidden');
+  hideMatchResult();
   startSoloMode();
 });
 dom.logoutButton?.addEventListener('click', logout);
@@ -152,6 +154,17 @@ dom.fleetConfigButton?.addEventListener('click', () => {
 // --- battle screen ------------------------------------------------------------
 
 dom.forfeitButton?.addEventListener('click', handleForfeit);
+dom.setupBackButton?.addEventListener('click', () => showLobbyScreen());
+
+// End-of-match actions
+dom.resultAgain?.addEventListener('click', () => {
+  hideMatchResult();
+  startSoloMode();
+});
+dom.resultLobby?.addEventListener('click', () => {
+  hideMatchResult();
+  showLobbyScreen();
+});
 dom.backToLobbyButton?.addEventListener('click', () => showLobbyScreen());
 
 if (dom.enemyGrid) {

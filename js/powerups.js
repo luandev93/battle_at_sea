@@ -37,6 +37,13 @@ export function setPowerUpsEnabled(value) {
   }
 }
 
+// A flat count of 4 was tuned for a 10x10 board. On 14x14 that is 2.7%
+// of the water — roughly 37 misses before finding one, which is why they
+// went unnoticed. Scale with the board so they actually show up.
+function powerUpCountForBoard() {
+  return Math.max(4, Math.round((GRID_SIZE * GRID_SIZE) / 18));
+}
+
 export function setupSoloPowerUps() {
   if (!state.playerFleet || !state.soloEnemyFleet) return;
   clearPowerUpMarkers(dom.enemyGrid);
@@ -46,8 +53,9 @@ export function setupSoloPowerUps() {
     state.enemyPowerUps.clear();
     return;
   }
-  state.playerPowerUps = pickPowerUpCells(state.playerFleet, 4);
-  state.enemyPowerUps = pickPowerUpCells(state.soloEnemyFleet, 4);
+  const count = powerUpCountForBoard();
+  state.playerPowerUps = pickPowerUpCells(state.playerFleet, count);
+  state.enemyPowerUps = pickPowerUpCells(state.soloEnemyFleet, count);
 }
 
 function revivePlayerShip() {
@@ -146,6 +154,18 @@ export function activatePowerUp(type) {
 // `triggeredByPlayer` picks which side's power-up map is checked (the
 // player reveals power-ups hidden in the *enemy's* water, and vice
 // versa) and therefore which grid the reveal is drawn on.
+// A status line was too easy to miss; a banner makes the pickup obvious.
+function announcePowerUp(type, triggeredByPlayer) {
+  const banner = document.getElementById('powerup-banner');
+  if (!banner) return;
+  const who = triggeredByPlayer ? 'Você encontrou' : 'O adversário revelou';
+  banner.innerHTML = `<strong>${powerUpLabels[type]}</strong><span>${who} uma caixa surpresa!</span>`;
+  banner.classList.remove('powerup-banner-on');
+  void banner.offsetWidth;
+  banner.classList.add('powerup-banner-on');
+  setTimeout(() => banner.classList.remove('powerup-banner-on'), 2600);
+}
+
 export function maybeActivatePowerUp(cellId, triggeredByPlayer) {
   if (!state.powerUpsEnabled) return null;
 
@@ -155,6 +175,7 @@ export function maybeActivatePowerUp(cellId, triggeredByPlayer) {
   const type = sourceMap.get(cellId);
   sourceMap.delete(cellId);
   markPowerUpCell(triggeredByPlayer ? dom.enemyGrid : dom.myGrid, cellId);
+  announcePowerUp(type, triggeredByPlayer);
   activatePowerUp(type);
   return type;
 }

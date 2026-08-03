@@ -70,6 +70,7 @@ export const dom = {
   clearGridButton: byId('clear-grid'),
   randomizeGridButton: byId('randomize-grid'),
   saveFleetButton: byId('save-fleet'),
+  setupBackButton: byId('setup-back'),
   setupControls: byId('setup-controls'),
 
   // periscope / cannon HUD (visible only in targeting mode)
@@ -85,6 +86,19 @@ export const dom = {
   startMatchButton: byId('start-match-button'),
   roomFleetStatus: byId('room-fleet-status'),
   roomConfigureFleet: byId('room-configure-fleet'),
+
+  // profile name (chosen once)
+  namePanel: byId('name-panel'),
+  profileNameInput: byId('profile-name-input'),
+  profileNameError: byId('profile-name-error'),
+  confirmNameButton: byId('confirm-name-button'),
+
+  // end of match
+  resultPanel: byId('result-panel'),
+  resultTitle: byId('result-title'),
+  resultMessage: byId('result-message'),
+  resultAgain: byId('result-again'),
+  resultLobby: byId('result-lobby'),
   roomPowerUps: byId('room-powerups'),
   roomMusic: byId('room-music'),
   battleStatus: byId('battle-status'),
