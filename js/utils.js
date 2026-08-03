@@ -2,7 +2,7 @@
 // No DOM access and no game state here on purpose, so these stay
 // trivial to unit test in isolation.
 
-export const GRID_SIZE = 10;
+export const GRID_SIZE = 14;
 
 export function coordToCellId(row, col) {
   return row * GRID_SIZE + col + 1;

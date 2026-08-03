@@ -1,10 +1,10 @@
-import { coordToCellId, cellIdToCoord, getNeighbors } from './utils.js';
+import { coordToCellId, cellIdToCoord, getNeighbors, GRID_SIZE } from './utils.js';
 
 // Classic Battleship AI: fires randomly ("hunt") until it lands a hit,
 // then queues up the four neighboring cells and works along the line
 // of the hit ship ("target") until it's sunk.
 export class BotAI {
-  constructor(gridSize = 10) {
+  constructor(gridSize = GRID_SIZE) {
     this.gridSize = gridSize;
     this.availableShots = new Set(Array.from({ length: gridSize * gridSize }, (_, i) => i + 1));
     this.mode = 'hunt';

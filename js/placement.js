@@ -4,10 +4,22 @@ import { dom } from './dom.js';
 import { state } from './state.js';
 import { GRID_SIZE, coordToCellId, cellIdToCoord } from './utils.js';
 import { fleetBlueprints, getBlueprint, getShipLabel } from './fleetBlueprints.js';
+import { getShipIconSvg } from './shipIcons.js';
 import { coordsForPlacement, coordsForPlacementClamped, getPatternBounds, rotateAndFlipPattern } from './shipGeometry.js';
 import { fleetCanPlace, buildPlayerFleetFromPlacement } from './fleet.js';
 import { getCellElement } from './board.js';
-import { displayError, setBattleStatus, showLobbyScreen } from './ui.js';
+import { setBattleStatus, showLobbyScreen } from './ui.js';
+
+
+const DEFAULT_HINT = 'Toque numa casa para posicionar o navio. Arraste para ajustar antes de soltar.';
+
+// Setup feedback has to land in the setup panel: the global error box
+// lives on the login screen and is invisible from here.
+function setSetupMessage(text, isError = false) {
+  if (!dom.setupMessage) return;
+  dom.setupMessage.textContent = text || DEFAULT_HINT;
+  dom.setupMessage.classList.toggle('setup-message-error', Boolean(isError));
+}
 
 let ghostEl = null;
 let dragShipId = null;
@@ -62,25 +74,72 @@ function buildSilhouette(ship) {
   return el;
 }
 
+// The old inventory listed all 13 ships as cards, which on a phone
+// pushed the board completely off-screen: you could see the fleet or the
+// grid, never both. Instead we show one ship at a time with < > arrows,
+// so the whole setup UI fits in a single compact strip under the board.
+
+function unplacedShips() {
+  return state.placement.ships.filter((s) => s.coords.length === 0);
+}
+
+// Keeps the selection pointing at a real, still-unplaced ship.
+function normalizeSelection() {
+  const pending = unplacedShips();
+  if (pending.length === 0) {
+    state.selectedShipId = null;
+    return;
+  }
+  if (!pending.some((s) => s.id === state.selectedShipId)) {
+    state.selectedShipId = pending[0].id;
+  }
+}
+
+export function cycleSelection(step) {
+  const pending = unplacedShips();
+  if (pending.length === 0) return;
+  const idx = pending.findIndex((s) => s.id === state.selectedShipId);
+  const next = (idx + step + pending.length) % pending.length;
+  state.selectedShipId = pending[next].id;
+  renderInventory();
+}
+
 export function renderInventory() {
-  if (!dom.shipInventory) return;
-  dom.shipInventory.innerHTML = '';
+  if (!dom.shipSelector) return;
+  normalizeSelection();
 
-  state.placement.ships.forEach((ship) => {
-    const placed = ship.coords && ship.coords.length > 0;
-    const card = document.createElement('div');
-    card.className = `ship-card${placed ? ' ship-card-placed' : ''}`;
-    card.dataset.shipId = ship.id;
+  const pending = unplacedShips();
+  const total = state.placement.ships.length;
+  const placedCount = total - pending.length;
 
-    const silhouette = buildSilhouette(ship);
-    const label = document.createElement('span');
-    label.className = 'ship-card-label';
-    label.textContent = placed ? `${getShipLabel(ship)} ✓` : getShipLabel(ship);
+  if (pending.length === 0) {
+    dom.shipSelector.innerHTML = `
+      <div class="selector-done">
+        <strong>Frota completa</strong>
+        <span>${total}/${total} navios posicionados — toque em Salvar</span>
+      </div>`;
+    return;
+  }
 
-    card.appendChild(silhouette);
-    card.appendChild(label);
-    card.addEventListener('pointerdown', (event) => startDragFromInventory(event, ship.id));
-    dom.shipInventory.appendChild(card);
+  const ship = pending.find((s) => s.id === state.selectedShipId) || pending[0];
+  const sameType = pending.filter((s) => s.type === ship.type).length;
+
+  dom.shipSelector.innerHTML = `
+    <button type="button" class="selector-arrow" data-step="-1" aria-label="Navio anterior">‹</button>
+    <div class="selector-body">
+      <div class="selector-icon">${getShipIconSvg(ship.type)}</div>
+      <div class="selector-meta">
+        <span class="selector-name">${getShipLabel(ship)}</span>
+        <span class="selector-count">${sameType > 1 ? `${sameType} restantes · ` : ''}${placedCount}/${total} posicionados</span>
+      </div>
+      <div class="selector-footprint" id="selector-footprint"></div>
+    </div>
+    <button type="button" class="selector-arrow" data-step="1" aria-label="Próximo navio">›</button>`;
+
+  dom.shipSelector.querySelector('#selector-footprint')?.appendChild(buildSilhouette(ship));
+
+  dom.shipSelector.querySelectorAll('.selector-arrow').forEach((btn) => {
+    btn.addEventListener('click', () => cycleSelection(Number(btn.dataset.step)));
   });
 }
 
@@ -144,26 +203,6 @@ function startDrag(shipId, clientX, clientY) {
   window.addEventListener('pointermove', handleDragMove);
   window.addEventListener('pointerup', handleDragEnd, { once: true });
   window.addEventListener('pointercancel', handleDragCancel, { once: true });
-}
-
-function startDragFromInventory(event, shipId) {
-  event.preventDefault();
-  const ship = state.placement.ships.find((s) => s.id === shipId);
-  if (!ship) return;
-
-  // The inventory keeps showing ships that are already on the board (as
-  // dimmed cards), so a card drag can be a *re-placement*. If we treated
-  // it as a fresh drop, the ship's previous cells would stay marked as
-  // occupied forever — a phantom hull that blocks placement and can never
-  // be cleared. So lift it off the grid first, exactly like a grid drag.
-  if (ship.coords.length > 0) {
-    startDragFromGrid(event, shipId);
-    return;
-  }
-
-  dragIsReposition = false;
-  dragOriginalCoords = null;
-  startDrag(shipId, event.clientX, event.clientY);
 }
 
 function startDragFromGrid(event, shipId) {
@@ -242,11 +281,15 @@ function handleDragEnd(event) {
     const coords = coordsForPlacementClamped(cell.dataset.cell, ship, state.placingOrientation, state.placingDir);
     if (coords && canPlace(coords)) {
       commitPlacement(ship, coords);
+      setSetupMessage('');
     } else if (dragIsReposition) {
       restoreOriginalPosition(ship);
-      displayError('Posição inválida. O navio voltou ao lugar anterior.');
+      setSetupMessage('Posição inválida. O navio voltou ao lugar anterior.', true);
+    } else {
+      // Placing a newly selected ship on top of another one: say so,
+      // otherwise the ship just fails to appear with no explanation.
+      setSetupMessage('Espaço ocupado. Escolha outro ponto ou gire o navio.', true);
     }
-    // invalid drop of a fresh inventory ship: simply stays unplaced
   } else if (ship && dragIsReposition) {
     // dropped outside the grid: remove the ship (send back to inventory)
     ship.coords = [];
@@ -283,15 +326,37 @@ function handleDragCancel() {
 // pointerdown on an already-placed ship's cell picks it up for repositioning.
 // Guarded so this only ever fires during fleet setup, never mid-battle
 // (the same #my-grid element is reused to show battle damage later).
+// A single pointer path handles both gestures, because a tap is simply a
+// drag that never moved: press an occupied cell to pick that ship up,
+// press an empty cell to bring in the currently selected one. Release
+// commits wherever the preview is. This is what makes placement workable
+// on a phone, where there is no hover to preview with.
 function handleGridPointerDown(event) {
   if (dom.tacticalBoard?.dataset.mode !== 'setup') return;
 
   const cell = event.target.closest('.board-cell');
   if (!cell) return;
+
   const { row, col } = cellIdToCoord(cell.dataset.cell);
   const shipId = state.placement.grid[row][col];
-  if (!shipId) return;
-  startDragFromGrid(event, shipId);
+
+  if (shipId) {
+    startDragFromGrid(event, shipId);
+    return;
+  }
+
+  normalizeSelection();
+  if (!state.selectedShipId) return;
+
+  dragIsReposition = false;
+  dragOriginalCoords = null;
+  startDrag(state.selectedShipId, event.clientX, event.clientY);
+
+  // Show the footprint immediately so a plain tap still previews before
+  // the finger lifts, instead of only reacting once it moves.
+  const ship = state.placement.ships.find((s) => s.id === state.selectedShipId);
+  const coords = coordsForPlacementClamped(cell.dataset.cell, ship, state.placingOrientation, state.placingDir);
+  if (coords) showPreview(coords, canPlace(coords));
 }
 
 // --- bulk actions -------------------------------------------------------
@@ -365,7 +430,7 @@ export function saveFleet() {
   });
 
   if (!allPlaced) {
-    displayError('Você deve posicionar todos os navios antes de salvar.');
+    setSetupMessage('Posicione todos os navios antes de salvar.', true);
     return;
   }
 
@@ -380,7 +445,7 @@ export function saveFleet() {
   if (state.currentPlayerId) {
     setDoc(doc(db, 'users', state.currentPlayerId), { fleet: state.placement.ships }, { merge: true })
       .catch(() => {
-        displayError('Não foi possível salvar a frota remotamente. Salvando localmente.');
+        setSetupMessage('Frota salva neste dispositivo (sem conexão com o servidor).', true);
       })
       .finally(goBack);
   } else {

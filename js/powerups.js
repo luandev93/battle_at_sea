@@ -1,6 +1,6 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { shuffle, coordToCellId } from './utils.js';
+import { shuffle, coordToCellId, GRID_SIZE } from './utils.js';
 import { getWaterCells, fleetCanPlace } from './fleet.js';
 import { coordsForPlacement } from './shipGeometry.js';
 import { getBlueprint } from './fleetBlueprints.js';
@@ -78,9 +78,9 @@ function repositionPlayerShip() {
     });
 
     const availableCells = [];
-    for (let row = 0; row < 10; row += 1) {
-      for (let col = 0; col < 10; col += 1) {
-        const cellId = row * 10 + col + 1;
+    for (let row = 0; row < GRID_SIZE; row += 1) {
+      for (let col = 0; col < GRID_SIZE; col += 1) {
+        const cellId = coordToCellId(row, col);
         ['horizontal', 'vertical'].forEach((orientation) => {
           [1, -1].forEach((dir) => {
             const coords = coordsForPlacement(cellId, { type: ship.type }, orientation, dir);

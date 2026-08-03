@@ -209,15 +209,32 @@
             </div>
 
             <div class="setup-panel" id="setup-panel">
+              <div class="ship-selector" id="ship-selector" aria-label="Selecionar navio"></div>
+
               <div class="setup-controls" id="setup-controls">
-                <button type="button" id="rotate-ship" class="secondary-button">Rotacionar</button>
-                <button type="button" id="flip-ship" class="secondary-button">Espelhar</button>
-                <button type="button" id="clear-grid" class="secondary-button">Limpar</button>
-                <button type="button" id="randomize-grid" class="secondary-button">Aleatório</button>
-                <button type="button" id="save-fleet" class="primary-button">Salvar Frota</button>
+                <button type="button" id="rotate-ship" class="icon-button" title="Rotacionar" aria-label="Rotacionar navio">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+                  <span>Girar</span>
+                </button>
+                <button type="button" id="flip-ship" class="icon-button" title="Espelhar" aria-label="Espelhar navio">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v16h-2zM9 7L3 12l6 5zm6 0v10l6-5z"/></svg>
+                  <span>Espelhar</span>
+                </button>
+                <button type="button" id="randomize-grid" class="icon-button" title="Preencher aleatoriamente" aria-label="Preencher aleatoriamente">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm3 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm8 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-4 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-4 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm8 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+                  <span>Aleatório</span>
+                </button>
+                <button type="button" id="clear-grid" class="icon-button" title="Limpar grade" aria-label="Limpar grade">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7zm3-4h6l1 2H8l1-2z"/></svg>
+                  <span>Limpar</span>
+                </button>
+                <button type="button" id="save-fleet" class="icon-button icon-button-primary" title="Salvar frota" aria-label="Salvar frota">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+                  <span>Salvar</span>
+                </button>
               </div>
-              <div class="ship-inventory" id="ship-inventory" aria-label="Navios disponíveis"></div>
-              <p class="card-note">Segure e arraste um navio até a grade. Toque em "Rotacionar"/"Espelhar" antes de soltar para girar. Arraste um navio já posicionado para fora da grade para removê-lo.</p>
+
+              <p class="setup-message" id="setup-message" aria-live="polite">Toque numa casa para posicionar o navio. Arraste para ajustar antes de soltar.</p>
             </div>
           </section>
         </div>

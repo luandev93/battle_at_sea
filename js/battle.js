@@ -1,6 +1,6 @@
 import { dom } from './dom.js';
 import { state } from './state.js';
-import { clamp, coordToCellId, cellIdToCoord } from './utils.js';
+import { clamp, coordToCellId, cellIdToCoord, GRID_SIZE } from './utils.js';
 import { createFleet, applyShotToFleet, isFleetSunk } from './fleet.js';
 import { BotAI } from './botAI.js';
 import { maybeActivatePowerUp, setupSoloPowerUps } from './powerups.js';
@@ -20,7 +20,7 @@ export function startSoloMode() {
   }
 
   state.isSoloMode = true;
-  state.botAI = new BotAI(10);
+  state.botAI = new BotAI(GRID_SIZE);
   state.soloEnemyFleet = createFleet();
   setupSoloPowerUps();
 

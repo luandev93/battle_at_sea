@@ -1,6 +1,6 @@
 import { coordToCellId, GRID_SIZE } from './utils.js';
 
-const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
 
 // Builds a 10x10 grid of `.board-cell` divs inside `container` instead
 // of hard-coding 100 <div> elements per grid in index.html.

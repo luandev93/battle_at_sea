@@ -39,7 +39,8 @@ export const state = {
   fleetSaved: false,
   placingOrientation: 'horizontal', // 'horizontal' | 'vertical'
   placingDir: 1, // 1 forward, -1 reverse
-  placement: null, // { grid: 10x10 of null|shipId, ships: [...] }
+  placement: null, // { grid: 14x14 of null|shipId, ships: [...] }
+  selectedShipId: null, // ship currently armed in the setup selector
 
   // which screen is currently visible: 'login' | 'lobby' | 'battle'
   currentScreen: 'login',

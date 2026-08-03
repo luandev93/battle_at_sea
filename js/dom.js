@@ -61,7 +61,8 @@ export const dom = {
   myRowLabels: byId('my-row-labels'),
 
   // fleet setup (visible only in setup mode)
-  shipInventory: byId('ship-inventory'),
+  shipSelector: byId('ship-selector'),
+  setupMessage: byId('setup-message'),
   rotateShipButton: byId('rotate-ship'),
   flipShipButton: byId('flip-ship'),
   clearGridButton: byId('clear-grid'),
