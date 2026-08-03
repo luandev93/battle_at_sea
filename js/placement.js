@@ -607,7 +607,13 @@ export function saveFleet() {
     dom.fleetConfigStatus.textContent = 'Frota salva.';
   }
 
-  const goBack = () => showLobbyScreen();
+  const goBack = () => {
+    showLobbyScreen();
+    // Hand the player straight back to the room they came from, with the
+    // start button now unlocked.
+    document.getElementById('room-panel')?.classList.remove('hidden');
+    document.dispatchEvent(new CustomEvent('fleet-saved'));
+  };
 
   if (state.currentPlayerId) {
     setDoc(doc(db, 'users', state.currentPlayerId), { fleet: state.placement.ships }, { merge: true })

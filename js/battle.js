@@ -66,10 +66,11 @@ export function startSoloMode() {
   beginPlayerTurn('Combate iniciado. Sua vez.');
 }
 
+// The caller (sendFireCommand) has already validated the cell and marked
+// it as fired; re-checking dataset.shot here aborted every single shot.
 function processPlayerShot(cell) {
-  if (!cell || cell.dataset.shot) return;
+  if (!cell) return;
 
-  cell.dataset.shot = 'true';
   const cellId = cell.dataset.cell;
   const powerUpType = maybeActivatePowerUp(cellId, true);
   const { hit, sunk, ship } = applyShotToFleet(state.soloEnemyFleet, cellId);
@@ -351,31 +352,23 @@ export function handleBoardTouchMove(event) {
   updateReticlePosition(touch.clientX, touch.clientY);
 }
 
-// A tap selects the cell; the FOGO button (or a second tap) fires. This
-// avoids losing a turn to a mis-tap and matches how the arrow keys work.
+// Tapping a cell aims and fires in one gesture. The arrow keys move the
+// selection without firing, and the FOGO button shoots at the selection,
+// for players who want to line the shot up first.
 export function handleBoardClick(event) {
   const targetCell = event.target.closest('.board-cell');
   if (!targetCell) return;
-
-  if (state.selectedCellId === targetCell.dataset.cell) {
-    sendFireCommand(targetCell);
-    return;
-  }
   setSelectedCell(targetCell.dataset.cell);
+  sendFireCommand(targetCell);
 }
 
 export function handleBoardTouchStart(event) {
   if (!event.touches.length) return;
   event.preventDefault();
-  const touch = event.touches[0];
-  const cell = findCellFromPoint(touch.clientX, touch.clientY);
+  const cell = findCellFromPoint(event.touches[0].clientX, event.touches[0].clientY);
   if (!cell) return;
-
-  if (state.selectedCellId === cell.dataset.cell) {
-    sendFireCommand(cell);
-    return;
-  }
   setSelectedCell(cell.dataset.cell);
+  sendFireCommand(cell);
 }
 
 // The dedicated FOGO button fires at wherever the reticle currently is,

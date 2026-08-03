@@ -83,6 +83,8 @@ export const dom = {
   roomPanel: byId('room-panel'),
   closeRoomButton: byId('close-room-button'),
   startMatchButton: byId('start-match-button'),
+  roomFleetStatus: byId('room-fleet-status'),
+  roomConfigureFleet: byId('room-configure-fleet'),
   roomPowerUps: byId('room-powerups'),
   roomMusic: byId('room-music'),
   battleStatus: byId('battle-status'),

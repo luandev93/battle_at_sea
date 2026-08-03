@@ -1306,6 +1306,27 @@ button:hover {
 
 .room-start { width: 100%; }
 
+.room-start:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+.room-fleet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.room-fleet-status {
+  font-size: 0.82rem;
+  color: #ffb4b4;
+}
+
+.room-fleet-ready { color: #6fe0a0; }
+
 .turn-clock {
   display: grid;
   place-items: center;

@@ -77,7 +77,42 @@ dom.passwordInput.addEventListener('blur', () => {
 
 // "Combate Solo" now opens the room setup instead of launching straight
 // into a match, so the rules are chosen up front.
-dom.startSoloButton?.addEventListener('click', () => dom.roomPanel?.classList.remove('hidden'));
+// Reflects whether a fleet is ready, and blocks starting without one.
+function syncRoomFleetState() {
+  const ready = Boolean(state.fleetSaved);
+  if (dom.roomFleetStatus) {
+    dom.roomFleetStatus.textContent = ready ? '✓ Frota pronta para o combate' : 'Frota não configurada';
+    dom.roomFleetStatus.classList.toggle('room-fleet-ready', ready);
+  }
+  if (dom.startMatchButton) {
+    dom.startMatchButton.disabled = !ready;
+    dom.startMatchButton.textContent = ready ? 'Iniciar Combate' : 'Configure a frota primeiro';
+  }
+}
+
+function openRoomPanel() {
+  syncRoomFleetState();
+  dom.roomPanel?.classList.remove('hidden');
+}
+
+dom.startSoloButton?.addEventListener('click', () => {
+  // Someone who has never set a fleet is sent straight to the shipyard
+  // instead of being shown a room they cannot start.
+  if (!state.fleetSaved) {
+    enterFleetSetup();
+    showBattleScreen('setup');
+    return;
+  }
+  openRoomPanel();
+});
+
+document.addEventListener('fleet-saved', syncRoomFleetState);
+
+dom.roomConfigureFleet?.addEventListener('click', () => {
+  dom.roomPanel?.classList.add('hidden');
+  enterFleetSetup();
+  showBattleScreen('setup');
+});
 dom.closeRoomButton?.addEventListener('click', () => dom.roomPanel?.classList.add('hidden'));
 
 // Each option group behaves like a radio set.

@@ -99,10 +99,22 @@ function enterLobbyAsUser(user) {
 // Without this the persisted session was never read back: the app always
 // opened on the login screen, so "lembrar" had no visible effect.
 export function watchAuthState() {
+  // Only auto-enter when the player actually asked to be remembered.
+  // Restoring any lingering session made the app jump to the lobby a
+  // second after load — right as someone was tapping the email field.
+  let remembered = false;
+  try {
+    remembered = Boolean(JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null')?.remember);
+  } catch (e) {
+    remembered = false;
+  }
+  if (!remembered) return;
+
   onAuthStateChanged(auth, (user) => {
-    if (user && user.emailVerified) {
-      enterLobbyAsUser(user);
-    }
+    // Never yank someone out of a form they are already filling in.
+    if (state.currentScreen !== 'login') return;
+    if (document.activeElement === dom.emailInput || document.activeElement === dom.passwordInput) return;
+    if (user && user.emailVerified) enterLobbyAsUser(user);
   });
 }
 
