@@ -21,14 +21,13 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
   min-height: 100%;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text);
   background: radial-gradient(circle at top, rgba(77, 181, 255, 0.16), transparent 32%),
     radial-gradient(circle at bottom, rgba(56, 145, 255, 0.14), transparent 25%),
     linear-gradient(180deg, #06131f 0%, #02050c 100%);
-  overflow: hidden;
+  overflow: auto;
 }
 
 body {
@@ -39,17 +38,17 @@ body {
 
 .page-shell {
   width: min(100%, 1200px);
-  height: 100vh;
+  min-height: 100vh;
   display: grid;
 }
 
 .screen {
   width: 100%;
-  height: 100%;
-  position: absolute;
-  inset: 0;
+  min-height: 100%;
+  position: relative;
   display: grid;
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .login-screen,
@@ -61,7 +60,7 @@ body {
   background: var(--panel);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .login-screen {
@@ -678,12 +677,12 @@ button:hover {
 .board {
   width: min(100%, 740px);
   aspect-ratio: 1 / 1;
-  margin: 0;
+  margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   grid-template-rows: repeat(10, 1fr);
-  gap: 8px;
-  padding: 16px;
+  gap: 6px;
+  padding: 12px;
   background: radial-gradient(circle at center, rgba(77, 181, 255, 0.1), transparent 55%),
     linear-gradient(180deg, rgba(8, 22, 40, 0.96), rgba(3, 10, 18, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -917,6 +916,129 @@ button:hover {
   display: grid;
 }
 
+@media (max-width: 900px) {
+  .page-shell {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .lobby-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: auto;
+  }
+
+  .lobby-main,
+  .lobby-sidebar,
+  .battle-shell {
+    min-height: auto;
+  }
+
+  .battle-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .battle-metrics {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .battle-status-panel {
+    min-width: auto;
+  }
+
+  .board-frame {
+    padding: 18px;
+  }
+
+  .board-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .board-row-labels,
+  .board-column-labels {
+    font-size: 0.76rem;
+  }
+
+  .board {
+    width: 100%;
+    padding: 10px;
+    gap: 5px;
+  }
+
+  .fleet-modal-card {
+    width: min(100%, 92vw);
+  }
+}
+
+@media (max-width: 700px) {
+  html,
+  body {
+    min-height: auto;
+  }
+
+  .page-shell {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .login-panel,
+  .lobby-panel,
+  .fleet-modal-card,
+  .battle-shell {
+    width: 100%;
+    padding: 20px;
+  }
+
+  .topbar,
+  .battle-top,
+  .options-card,
+  .fleet-modal-body,
+  .card,
+  .battle-status-panel {
+    padding: 16px;
+  }
+
+  .board-frame {
+    padding: 14px;
+  }
+
+  .board-shell {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .board-row-labels {
+    display: none;
+  }
+
+  .board-column-labels {
+    font-size: 0.7rem;
+    margin-bottom: 8px;
+  }
+
+  .board {
+    width: 100%;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .board-cell {
+    min-height: 0;
+  }
+
+  .battle-status {
+    font-size: 0.95rem;
+  }
+
+  .ammo-counter {
+    width: 82px;
+    height: 82px;
+  }
+}
+
 @media (max-width: 500px) {
   .page-shell {
     width: 100%;
@@ -924,6 +1046,34 @@ button:hover {
 
   .login-panel,
   .lobby-panel {
-    padding: 28px 22px;
+    padding: 22px 16px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .battle-top {
+    gap: 12px;
+  }
+
+  .battle-metrics {
+    flex-wrap: wrap;
+  }
+
+  .battle-status-panel {
+    width: 100%;
+  }
+
+  .button-row,
+  .card-actions,
+  .fleet-controls {
+    flex-direction: column;
+  }
+
+  .ammo-value {
+    font-size: 1.7rem;
   }
 }
+
