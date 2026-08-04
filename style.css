@@ -263,10 +263,6 @@ button:hover {
   border-color: rgba(75, 205, 255, 0.55);
 }
 
-.primary-button {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #03101d;
-}
 
 .secondary-button {
   background: rgba(255, 255, 255, 0.07);
@@ -1095,6 +1091,176 @@ button:hover {
 
 
 
+
+
+/* ============ Lobby ============ */
+
+/* The overlay is a full-height grid, so its rows stretched to fill the
+   screen and that stretch cascaded all the way down into the buttons,
+   turning them into 250px blocks that swallowed the cards. Anchoring the
+   content to the top stops the chain at the source. */
+.lobby-overlay {
+  align-content: start;
+}
+
+.game-cards,
+.lobby-main,
+.lobby-sidebar {
+  align-content: start;
+}
+
+.card {
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(26, 48, 70, 0.92), rgba(14, 30, 46, 0.92));
+  border: 1px solid rgba(140, 190, 230, 0.22);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(10px);
+}
+
+.card-head {
+  display: grid;
+  gap: 4px;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
+  color: #eaf4ff;
+}
+
+.card p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: rgba(196, 218, 236, 0.9);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Buttons size to their content instead of filling whatever box they
+   happen to sit in. */
+.primary-button,
+.secondary-button,
+.mute-button {
+  min-height: 46px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  align-self: center;
+  flex: 0 1 auto;
+}
+
+.card-actions .primary-button,
+.card-actions .secondary-button {
+  flex: 1 1 auto;
+}
+
+.card-note {
+  font-size: 0.76rem;
+  color: rgba(150, 200, 235, 0.8);
+}
+
+/* Top bar reads as a ship's console strip */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(20, 42, 64, 0.94), rgba(10, 24, 38, 0.94));
+  border: 1px solid rgba(140, 190, 230, 0.22);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbar-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 200, 235, 0.75);
+}
+
+.topbar-user {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #7fd8ff;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.topbar-actions .secondary-button,
+.topbar-actions .mute-button {
+  min-height: 40px;
+  padding: 9px 14px;
+  font-size: 0.82rem;
+}
+
+/* Side panels: readable surfaces instead of near-invisible tint */
+.panel {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(22, 44, 66, 0.9), rgba(12, 26, 42, 0.9));
+  border: 1px solid rgba(140, 190, 230, 0.2);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(150, 200, 235, 0.85);
+}
+
+.player-list,
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.player-list li,
+.history-list li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: rgba(214, 232, 245, 0.92);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.secondary-button {
+  background: rgba(140, 190, 230, 0.12);
+  border: 1px solid rgba(150, 200, 235, 0.35);
+  color: #dceaf6;
+}
+
+.mute-button {
+  background: rgba(140, 190, 230, 0.1);
+  border: 1px solid rgba(150, 200, 235, 0.3);
+  color: #dceaf6;
+}
 
 /* ============ Modais, resultado e acabamento de menu ============ */
 
@@ -1932,12 +2098,31 @@ button:hover {
     padding: 0 0 20px;
   }
 
-  .topbar,
   .options-card,
-  .card,
   .battle-status-panel {
     padding: 16px;
   }
+
+  .card {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .lobby-overlay {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .game-cards {
+    gap: 12px;
+  }
+
+  .lobby-grid {
+    gap: 14px;
+  }
+
+  .card h3 { font-size: 0.96rem; }
+  .card p { font-size: 0.8rem; }
 
   .battle-top,
   .grid-block,
