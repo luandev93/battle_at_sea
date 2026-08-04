@@ -77,19 +77,56 @@ export function restoreRememberPreference() {
 // whether they just typed their password or the session was restored.
 // The commander name is chosen once and then locked: it is only written
 // if the profile document has no name yet.
-export async function ensureProfileName(uid, fallback) {
+const NAME_KEY = 'battleAtSea.profileName';
+
+function readLocalName(uid) {
   try {
-    const ref = doc(db, 'users', uid);
-    const snap = await getDoc(ref);
+    const raw = localStorage.getItem(NAME_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    return saved && saved.uid === uid ? saved.name : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeLocalName(uid, name) {
+  try {
+    localStorage.setItem(NAME_KEY, JSON.stringify({ uid, name }));
+  } catch (e) {
+    // storage unavailable; the Firestore copy is the fallback
+  }
+}
+
+function applyName(name) {
+  state.profileName = name;
+  if (dom.playerName) dom.playerName.textContent = name;
+}
+
+export async function ensureProfileName(uid, fallback) {
+  // Check the device first. Asking again on every login meant a single
+  // failed or slow Firestore write cost the player their name each time;
+  // the local copy makes the choice stick regardless of the network.
+  const local = readLocalName(uid);
+  if (local) {
+    applyName(local);
+    // keep the remote copy in sync in the background, best effort
+    setDoc(doc(db, 'users', uid), { profileName: local }, { merge: true }).catch(() => {});
+    return local;
+  }
+
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
     const existing = snap.exists() ? snap.data().profileName : null;
     if (existing) {
-      state.profileName = existing;
-      if (dom.playerName) dom.playerName.textContent = existing;
+      applyName(existing);
+      writeLocalName(uid, existing);
       return existing;
     }
   } catch (e) {
-    // offline: fall through and ask for a name
+    // offline or blocked: fall through and ask
   }
+
   promptForName(uid, fallback);
   return null;
 }
@@ -111,15 +148,15 @@ function promptForName(uid, fallback) {
     }
     if (dom.profileNameError) dom.profileNameError.textContent = '';
 
-    state.profileName = value;
-    if (dom.playerName) dom.playerName.textContent = value;
+    applyName(value);
+    writeLocalName(uid, value); // persisted before the network call
     dom.namePanel.classList.add('hidden');
     dom.confirmNameButton?.removeEventListener('click', submit);
 
     try {
       await setDoc(doc(db, 'users', uid), { profileName: value }, { merge: true });
     } catch (e) {
-      // kept locally for this session if the write fails
+      // already saved on the device, so the name is not lost
     }
   };
 

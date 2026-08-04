@@ -288,15 +288,6 @@ button:hover {
     linear-gradient(180deg, #0d2136 0%, #0a1a2b 45%, #07131f 100%);
 }
 
-.lobby-overlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(1, 10, 22, 0.75), rgba(2, 8, 16, 0.92));
-  pointer-events: none;
-  z-index: 0;
-}
-
 .lobby-overlay {
   position: relative;
   z-index: 1;
