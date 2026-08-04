@@ -138,7 +138,7 @@
           <div id="room-panel" class="room-panel hidden">
             <div class="room-card">
               <div class="room-header">
-                <h4>Criar Sala</h4>
+                <h4>Prévia da Partida</h4>
                 <button type="button" id="close-room-button" class="text-button">Fechar</button>
               </div>
 
@@ -177,9 +177,25 @@
                 </div>
               </div>
 
-              <div class="room-section room-toggles">
-                <label class="room-toggle"><input type="checkbox" id="room-powerups" checked /> <span>Caixas surpresa</span></label>
-                <label class="room-toggle"><input type="checkbox" id="room-music" checked /> <span>Música</span></label>
+              <div class="room-section">
+                <span class="room-label">Eventos no tabuleiro</span>
+                <div class="event-options">
+                  <label class="event-toggle">
+                    <input type="checkbox" id="room-powerups" checked />
+                    <span class="event-icon">⚡</span>
+                    <span class="event-text"><strong>Caixas surpresa</strong><small>Tiro extra, reforço de casco e reposicionamento</small></span>
+                  </label>
+                  <label class="event-toggle">
+                    <input type="checkbox" id="room-mines" />
+                    <span class="event-icon">💣</span>
+                    <span class="event-text"><strong>Minas navais</strong><small>Explodem toda a área ao redor do disparo</small></span>
+                  </label>
+                  <label class="event-toggle">
+                    <input type="checkbox" id="room-music" checked />
+                    <span class="event-icon">🎵</span>
+                    <span class="event-text"><strong>Música</strong><small>Trilha durante o combate</small></span>
+                  </label>
+                </div>
               </div>
 
               <div class="room-section room-fleet">
@@ -192,8 +208,6 @@
 
               <div class="room-launch">
                 <button type="button" id="start-match-button" class="primary-button room-start">Combate Solo (IA)</button>
-                <button type="button" id="find-match-button" class="secondary-button room-start">Procurar Adversário Online</button>
-                <button type="button" id="cancel-match-button" class="secondary-button room-start hidden">Cancelar busca</button>
                 <p id="matchmaking-status" class="room-matchmaking"></p>
               </div>
             </div>

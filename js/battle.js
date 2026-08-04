@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { clamp, coordToCellId, cellIdToCoord, GRID_SIZE } from './utils.js';
 import { createFleet, applyShotToFleet, isFleetSunk } from './fleet.js';
 import { BotAI } from './botAI.js';
-import { maybeActivatePowerUp, setupSoloPowerUps } from './powerups.js';
+import { maybeActivatePowerUp, setupSoloPowerUps, hasMine, mineBlastCells, stampCellIcon } from './powerups.js';
 import { markSunkShipCells, clearGridShots, getCellElement, renderFleetOnGrid } from './board.js';
 import { setBattleStatus, setTargetBadge, displayError, showBattleScreen, setBattleMode } from './ui.js';
 import { startTurnClock, stopTurnClock, setTurnExpiryHandler } from './turnClock.js';
@@ -87,11 +87,38 @@ export function startSoloMode() {
 
 // The caller (sendFireCommand) has already validated the cell and marked
 // it as fired; re-checking dataset.shot here aborted every single shot.
+// Resolves the ring around a detonated mine as genuine shots, so the
+// blast can damage ships and not just paint water.
+function detonateMine(container, fleet, cellId, isEnemyGrid) {
+  stampCellIcon(container, cellId, 'mine');
+  container?.classList.add('mine-blast');
+  setTimeout(() => container?.classList.remove('mine-blast'), 400);
+
+  mineBlastCells(cellId).forEach((id) => {
+    const c = getCellElement(container, id);
+    if (!c || c.dataset.shot) return;
+    c.dataset.shot = 'true';
+
+    const res = applyShotToFleet(fleet, id);
+    if (res.hit) {
+      c.classList.add(isEnemyGrid ? 'board-cell-hit' : 'board-cell-bot-hit');
+      if (res.sunk && res.ship) {
+        markSunkShipCells(container, res.ship);
+        autoRevealWater(container, res.ship);
+      }
+    } else {
+      c.classList.add(isEnemyGrid ? 'board-cell-miss' : 'board-cell-bot-miss');
+    }
+  });
+  setBattleStatus('💣 Mina naval! A explosão atingiu toda a área ao redor.');
+}
+
 function processPlayerShot(cell) {
   if (!cell) return;
 
   const cellId = cell.dataset.cell;
   const powerUpType = maybeActivatePowerUp(cellId, true);
+  const mineHit = hasMine(cellId, true);
   const { hit, sunk, ship } = applyShotToFleet(state.soloEnemyFleet, cellId);
 
   playImpact(cell, hit);
@@ -106,7 +133,10 @@ function processPlayerShot(cell) {
     cell.classList.add('board-cell-miss');
   }
 
-  if (hit && sunk && isFleetSunk(state.soloEnemyFleet)) {
+  if (mineHit) detonateMine(dom.enemyGrid, state.soloEnemyFleet, cellId, true);
+
+  if (isFleetSunk(state.soloEnemyFleet)) {
+    renderEnemyFleetStatus();
     finishMatch('Sua frota dominou o mar. O adversário foi ao fundo.', true);
     awardPoints(2, 'solo_win');
     return;
@@ -149,6 +179,7 @@ function botTakeTurn() {
   }
 
   maybeActivatePowerUp(shotId, false);
+  const botMine = hasMine(shotId, false);
   const { hit, sunk } = applyShotToFleet(state.playerFleet, shotId);
   state.botAI.recordResult(shotId, hit, sunk);
 
@@ -166,7 +197,9 @@ function botTakeTurn() {
     }
   }
 
-  if (hit && sunk && isFleetSunk(state.playerFleet)) {
+  if (botMine) detonateMine(dom.myGrid, state.playerFleet, shotId, false);
+
+  if (isFleetSunk(state.playerFleet)) {
     awardPoints(0, 'solo_loss');
     finishMatch('Sua frota foi afundada. O adversário venceu.', false);
     return;
@@ -454,7 +487,12 @@ export function handleOpponentFire({ cell, shooterIndex }) {
     // best-effort sound
   }
 
-  emitFireResponse({ cell, shooterIndex, hit, sunk, defeated });
+  const sunkCells = sunk && ship ? ship.coords.map((c) => coordToCellId(c.row, c.col)) : [];
+  const autoWater = sunk && ship ? revealWaterAroundShip(ship) : [];
+
+  if (sunk && ship) autoRevealWater(dom.myGrid, ship);
+
+  emitFireResponse({ cell, shooterIndex, hit, sunk, defeated, sunkCells, autoWater });
 }
 
 export function handleMatchFound({ playerIndex, isPlayerTurn, config, opponent }) {
@@ -508,9 +546,22 @@ export function handleShotResult(payload) {
   if (isShooter) {
     const targetCell = getCellElement(dom.enemyGrid, cell);
     if (targetCell) {
+      targetCell.dataset.shot = 'true';
+      playImpact(targetCell, hit);
       targetCell.classList.add(hit ? 'board-cell-hit' : 'board-cell-miss');
-      if (sunk) targetCell.classList.add('board-cell-sunk');
     }
+
+    // Same treatment as solo: paint the whole sunk hull and the ring of
+    // water the no-touch rule guarantees around it.
+    (payload.sunkCells || []).forEach((id) => {
+      getCellElement(dom.enemyGrid, id)?.classList.add('board-cell-sunk');
+    });
+    (payload.autoWater || []).forEach((id) => {
+      const c = getCellElement(dom.enemyGrid, id);
+      if (!c || c.dataset.shot) return;
+      c.dataset.shot = 'true';
+      c.classList.add('board-cell-miss', 'board-cell-auto');
+    });
   }
 
   if (sunk) {

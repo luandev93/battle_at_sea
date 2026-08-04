@@ -4,7 +4,7 @@ import { generateGridCells, generateGridCoords } from './board.js';
 import { toggleAudioMuted } from './audio.js';
 import { openOptions, closeOptions, fillOnlinePlayers, fillPlayerHistory, showBattleScreen, showLobbyScreen } from './ui.js';
 import { loadStats } from './stats.js';
-import { setPowerUpsEnabled } from './powerups.js';
+import { setPowerUpsEnabled, setMinesEnabled } from './powerups.js';
 import { socket, emitFindMatch, emitCancelMatch, emitChallenge, emitAcceptChallenge, emitDeclineChallenge } from './network.js';
 import { applyMatchConfig, matchConfig } from './matchConfig.js';
 import { APP_VERSION } from './version.js';
@@ -145,37 +145,7 @@ document.querySelectorAll('.room-options').forEach((group) => {
   });
 });
 
-function setSearching(on) {
-  dom.findMatchButton?.classList.toggle('hidden', on);
-  dom.cancelMatchButton?.classList.toggle('hidden', !on);
-  if (dom.startMatchButton) dom.startMatchButton.disabled = on || !state.fleetSaved;
-  if (dom.matchmakingStatus) {
-    dom.matchmakingStatus.textContent = on ? 'Procurando adversário...' : '';
-  }
-}
-
-dom.findMatchButton?.addEventListener('click', () => {
-  if (!state.fleetSaved) {
-    if (dom.matchmakingStatus) dom.matchmakingStatus.textContent = 'Configure sua frota antes de buscar partida.';
-    return;
-  }
-  applyMatchConfig({
-    powerUps: Boolean(dom.roomPowerUps?.checked),
-    music: Boolean(dom.roomMusic?.checked),
-  });
-  setPowerUpsEnabled(matchConfig.powerUps);
-  setSearching(true);
-  emitFindMatch(matchConfig);
-});
-
-dom.cancelMatchButton?.addEventListener('click', () => {
-  emitCancelMatch();
-  setSearching(false);
-});
-
-socket.on('match_cancelled', () => setSearching(false));
 socket.on('match_found', () => {
-  setSearching(false);
   dom.roomPanel?.classList.add('hidden');
 });
 

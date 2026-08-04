@@ -28,6 +28,9 @@ export const state = {
 
   // power-ups
   enemyPowerUps: new Map(),
+  playerMines: new Set(),
+  enemyMines: new Set(),
+  minesEnabled: false,
   playerPowerUps: new Map(),
   extraShotActive: false,
   powerUpsEnabled: true,

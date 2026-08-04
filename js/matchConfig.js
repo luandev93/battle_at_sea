@@ -34,6 +34,7 @@ export const matchConfig = {
   turnRule: 'encadeado',
   turnClock: 'livre',
   powerUps: true,
+  mines: false,
   music: true,
 };
 

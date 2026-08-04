@@ -192,7 +192,7 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('opponent_fire', { cell, shooterIndex: playerIndex });
   });
 
-  socket.on('fire_response', ({ cell, shooterIndex, hit, sunk, defeated }) => {
+  socket.on('fire_response', ({ cell, shooterIndex, hit, sunk, defeated, sunkCells, autoWater }) => {
     const { roomId } = socket.data;
     if (!roomId || !rooms.has(roomId)) return;
     const room = rooms.get(roomId);
@@ -200,6 +200,7 @@ io.on('connection', (socket) => {
     if (defeated) {
       io.in(roomId).emit('shot_result', {
         cell, shooterIndex, nextTurn: shooterIndex, hit, sunk, defeated: true, winner: shooterIndex,
+        sunkCells, autoWater,
       });
       closeRoom(roomId);
       return;
@@ -212,7 +213,7 @@ io.on('connection', (socket) => {
     const nextTurn = hit && chains ? shooterIndex : shooterIndex === 1 ? 2 : 1;
     room.currentTurn = nextTurn;
 
-    io.in(roomId).emit('shot_result', { cell, shooterIndex, nextTurn, hit, sunk, defeated: false });
+    io.in(roomId).emit('shot_result', { cell, shooterIndex, nextTurn, hit, sunk, defeated: false, sunkCells, autoWater });
   });
 
   socket.on('forfeit_battle', () => {
