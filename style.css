@@ -280,6 +280,12 @@ button:hover {
   position: relative;
   display: grid;
   align-items: stretch;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(70, 150, 210, 0.30) 0%, transparent 60%),
+    radial-gradient(90% 60% at 15% 100%, rgba(30, 90, 140, 0.28) 0%, transparent 65%),
+    radial-gradient(90% 60% at 85% 90%, rgba(60, 40, 120, 0.22) 0%, transparent 60%),
+    linear-gradient(180deg, #0d2136 0%, #0a1a2b 45%, #07131f 100%);
 }
 
 .lobby-overlay::before {
@@ -313,6 +319,15 @@ button:hover {
 }
 
 .topbar-left,
+.app-version {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: rgba(150, 200, 235, 0.55);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -345,12 +360,14 @@ button:hover {
 
 .lobby-main,
 .lobby-sidebar {
-  background: rgba(8, 16, 28, 0.85);
-  border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 28px;
-  overflow: auto;
-  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.24);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+  box-shadow: none;
+  display: grid;
+  gap: 14px;
 }
 
 .game-cards {
@@ -1099,8 +1116,21 @@ button:hover {
    screen and that stretch cascaded all the way down into the buttons,
    turning them into 250px blocks that swallowed the cards. Anchoring the
    content to the top stops the chain at the source. */
+/* Faint horizon band so the lobby reads as a place, not a void. */
+.lobby-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, transparent 1px, transparent 46px);
+}
+
 .lobby-overlay {
   align-content: start;
+  position: relative;
+  z-index: 1;
 }
 
 .game-cards,
@@ -1114,7 +1144,7 @@ button:hover {
   gap: 12px;
   padding: 18px;
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(26, 48, 70, 0.92), rgba(14, 30, 46, 0.92));
+  background: linear-gradient(180deg, rgba(38, 66, 96, 0.94), rgba(20, 40, 62, 0.94));
   border: 1px solid rgba(140, 190, 230, 0.22);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(10px);
@@ -1218,18 +1248,18 @@ button:hover {
 /* Side panels: readable surfaces instead of near-invisible tint */
 .panel {
   padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(22, 44, 66, 0.9), rgba(12, 26, 42, 0.9));
-  border: 1px solid rgba(140, 190, 230, 0.2);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(38, 68, 98, 0.95), rgba(22, 44, 68, 0.95));
+  border: 1px solid rgba(160, 205, 240, 0.34);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .panel h3 {
   margin: 0 0 10px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(150, 200, 235, 0.85);
+  color: #8fd3ff;
 }
 
 .player-list,
@@ -1243,11 +1273,12 @@ button:hover {
 
 .player-list li,
 .history-list li {
-  padding: 8px 10px;
+  padding: 9px 11px;
   border-radius: 10px;
   font-size: 0.82rem;
-  color: rgba(214, 232, 245, 0.92);
-  background: rgba(255, 255, 255, 0.05);
+  color: #e8f2fa;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .secondary-button {
@@ -1415,10 +1446,6 @@ button:hover {
 .options-header h4 {
   font-size: 1.05rem;
   letter-spacing: 0.03em;
-}
-
-.room-label {
-  color: rgba(150, 200, 235, 0.85);
 }
 
 .room-option {
@@ -1610,7 +1637,7 @@ button:hover {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(150, 200, 235, 0.85);
 }
 
 .room-options {
