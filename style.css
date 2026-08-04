@@ -1677,6 +1677,37 @@ button:hover {
 
 .room-start { width: 100%; }
 
+.room-launch {
+  display: grid;
+  gap: 8px;
+}
+
+.room-matchmaking {
+  margin: 0;
+  min-height: 18px;
+  font-size: 0.78rem;
+  text-align: center;
+  color: #8fd3ff;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-status {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.status-idle { background: rgba(140, 190, 230, 0.18); color: #cfe6f7; }
+.status-searching { background: rgba(255, 200, 90, 0.22); color: #ffd98a; }
+.status-busy { background: rgba(255, 110, 110, 0.22); color: #ffb0b0; }
+
 .room-start:disabled {
   opacity: 0.45;
   cursor: not-allowed;

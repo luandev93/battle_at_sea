@@ -70,6 +70,7 @@
               <span class="topbar-user" id="player-name">Visitante</span>
               <span id="patent-icon" class="patent-icon" aria-hidden="true"></span>
             </div>
+            <span id="app-version" class="app-version" aria-label="Versão do jogo"></span>
             <div class="topbar-actions">
               <button type="button" id="toggle-audio-button" class="mute-button">Som: Ligado</button>
               <button type="button" id="options-button" class="secondary-button">Opções</button>
@@ -185,7 +186,12 @@
                 </div>
               </div>
 
-              <button type="button" id="start-match-button" class="primary-button room-start">Iniciar Combate</button>
+              <div class="room-launch">
+                <button type="button" id="start-match-button" class="primary-button room-start">Combate Solo (IA)</button>
+                <button type="button" id="find-match-button" class="secondary-button room-start">Procurar Adversário Online</button>
+                <button type="button" id="cancel-match-button" class="secondary-button room-start hidden">Cancelar busca</button>
+                <p id="matchmaking-status" class="room-matchmaking"></p>
+              </div>
             </div>
           </div>
 

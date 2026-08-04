@@ -7,7 +7,7 @@ import { maybeActivatePowerUp, setupSoloPowerUps } from './powerups.js';
 import { markSunkShipCells, clearGridShots, getCellElement, renderFleetOnGrid } from './board.js';
 import { setBattleStatus, setTargetBadge, displayError, showBattleScreen, setBattleMode } from './ui.js';
 import { startTurnClock, stopTurnClock, setTurnExpiryHandler } from './turnClock.js';
-import { chainsOnHit, firesOnTap } from './matchConfig.js';
+import { chainsOnHit, firesOnTap, applyMatchConfig } from './matchConfig.js';
 import { getShipIconSvg } from './shipIcons.js';
 import { getShipLabel } from './fleetBlueprints.js';
 import { revealWaterAroundShip } from './fleet.js';
@@ -456,9 +456,18 @@ export function handleOpponentFire({ cell, shooterIndex }) {
   emitFireResponse({ cell, shooterIndex, hit, sunk, defeated });
 }
 
-export function handleMatchFound({ playerIndex, isPlayerTurn }) {
+export function handleMatchFound({ playerIndex, isPlayerTurn, config, opponent }) {
   state.playerIndex = playerIndex;
   state.isPlayerTurn = isPlayerTurn;
+  state.isSoloMode = false;
+
+  // Both sides must play on the same board with the same rules, so the
+  // room's config wins over whatever was selected locally.
+  if (config && Object.keys(config).length) {
+    applyMatchConfig(config);
+    document.dispatchEvent(new CustomEvent('rebuild-boards'));
+  }
+  if (opponent) state.opponentName = opponent;
 
   if (!state.fleetSaved) {
     emitDeclineMatch();
@@ -475,11 +484,14 @@ export function handleMatchFound({ playerIndex, isPlayerTurn }) {
   clearGridShots(dom.myGrid);
   renderFleetOnGrid(dom.myGrid, state.playerFleet);
 
+  renderEnemyFleetStatus();
   showBattleScreen(isPlayerTurn ? 'targeting' : 'waiting');
+
+  const vs = state.opponentName ? ` contra ${state.opponentName}` : '';
   if (isPlayerTurn) {
-    beginPlayerTurn('Partida online iniciada. Sua vez.');
+    beginPlayerTurn(`Combate${vs} iniciado. Sua vez.`);
   } else {
-    endPlayerTurn('Partida online iniciada. Aguarde o adversário.');
+    endPlayerTurn(`Combate${vs} iniciado. Aguarde o adversário.`);
   }
 }
 

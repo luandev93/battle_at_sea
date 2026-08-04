@@ -9,142 +9,169 @@ const port = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname)));
 
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-  },
-});
+const io = new Server(server, { cors: { origin: '*' } });
 
+// Players waiting for an opponent. Matchmaking is explicit: connecting
+// no longer pairs you with a stranger. Previously a socket was matched
+// the instant the page loaded, before the player had a fleet, so the
+// client immediately declined and PvP could never actually start.
 let waitingSocket = null;
 const rooms = new Map();
-
-function createMatchRoom(firstSocket, secondSocket) {
-  const roomId = `room-${firstSocket.id}-${secondSocket.id}`;
-  firstSocket.join(roomId);
-  secondSocket.join(roomId);
-
-  firstSocket.data.roomId = roomId;
-  secondSocket.data.roomId = roomId;
-  firstSocket.data.playerIndex = 1;
-  secondSocket.data.playerIndex = 2;
-
-  rooms.set(roomId, {
-    players: [firstSocket.id, secondSocket.id],
-    currentTurn: 1,
-  });
-
-  firstSocket.emit('match_found', { playerIndex: 1, isPlayerTurn: true });
-  secondSocket.emit('match_found', { playerIndex: 2, isPlayerTurn: false });
-  console.log(`Match found in room ${roomId}`);
-}
-
 const connectedPlayers = new Map();
 
-io.on('connection', (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
-  connectedPlayers.set(socket.id, { id: socket.id, name: 'Jogador' });
-  io.emit('online_players', Array.from(connectedPlayers.values()).map((player) => player.name));
+function broadcastPlayers() {
+  io.emit(
+    'online_players',
+    Array.from(connectedPlayers.values()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+    }))
+  );
+}
 
-  if (waitingSocket && waitingSocket.connected) {
-    createMatchRoom(waitingSocket, socket);
-    waitingSocket = null;
-  } else {
-    waitingSocket = socket;
-    socket.emit('waiting_for_opponent');
-    console.log(`Socket waiting: ${socket.id}`);
+function setStatus(socketId, status) {
+  const player = connectedPlayers.get(socketId);
+  if (player) {
+    player.status = status;
+    broadcastPlayers();
   }
+}
+
+function leaveQueue(socket) {
+  if (waitingSocket && waitingSocket.id === socket.id) {
+    waitingSocket = null;
+  }
+}
+
+function createMatchRoom(a, b, config) {
+  const roomId = `room-${a.id}-${b.id}`;
+  a.join(roomId);
+  b.join(roomId);
+
+  a.data.roomId = roomId;
+  b.data.roomId = roomId;
+  a.data.playerIndex = 1;
+  b.data.playerIndex = 2;
+
+  rooms.set(roomId, { players: [a.id, b.id], currentTurn: 1, config });
+
+  const nameOf = (s) => connectedPlayers.get(s.id)?.name || 'Adversário';
+
+  // Both clients must play by the same rules and on the same board, so
+  // the room config travels with the match instead of each side using
+  // whatever it had selected locally.
+  a.emit('match_found', { playerIndex: 1, isPlayerTurn: true, config, opponent: nameOf(b) });
+  b.emit('match_found', { playerIndex: 2, isPlayerTurn: false, config, opponent: nameOf(a) });
+
+  setStatus(a.id, 'Em combate');
+  setStatus(b.id, 'Em combate');
+  console.log(`Match created: ${roomId}`);
+}
+
+function closeRoom(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  room.players.forEach((id) => {
+    const s = io.sockets.sockets.get(id);
+    if (s) {
+      s.leave(roomId);
+      s.data.roomId = null;
+      s.data.playerIndex = null;
+      setStatus(id, 'No lobby');
+    }
+  });
+  rooms.delete(roomId);
+}
+
+io.on('connection', (socket) => {
+  connectedPlayers.set(socket.id, { id: socket.id, name: 'Jogador', status: 'No lobby' });
+  broadcastPlayers();
+
+  socket.on('player_info', ({ name }) => {
+    const player = connectedPlayers.get(socket.id);
+    if (player) player.name = name || 'Jogador';
+    broadcastPlayers();
+  });
+
+  // Explicit matchmaking, triggered by the player pressing "Procurar".
+  socket.on('find_match', ({ config } = {}) => {
+    if (socket.data.roomId) return;
+
+    if (waitingSocket && waitingSocket.connected && waitingSocket.id !== socket.id) {
+      const opponent = waitingSocket;
+      waitingSocket = null;
+      // The player who was waiting owns the rules of the room.
+      createMatchRoom(opponent, socket, opponent.data.pendingConfig || config || {});
+      return;
+    }
+
+    waitingSocket = socket;
+    socket.data.pendingConfig = config || {};
+    setStatus(socket.id, 'Procurando partida');
+    socket.emit('waiting_for_opponent');
+  });
+
+  socket.on('cancel_match', () => {
+    leaveQueue(socket);
+    setStatus(socket.id, 'No lobby');
+    socket.emit('match_cancelled');
+  });
 
   socket.on('fire_cannon', ({ cell }) => {
     const { roomId, playerIndex } = socket.data;
-    if (!roomId || !rooms.has(roomId)) {
-      return;
-    }
+    if (!roomId || !rooms.has(roomId)) return;
 
     const room = rooms.get(roomId);
-    if (room.currentTurn !== playerIndex) {
-      return;
-    }
+    if (room.currentTurn !== playerIndex) return;
 
-    // forward the fire to the opponent to validate hit/sunk locally
     socket.to(roomId).emit('opponent_fire', { cell, shooterIndex: playerIndex });
   });
 
   socket.on('fire_response', ({ cell, shooterIndex, hit, sunk, defeated }) => {
-    const { roomId, playerIndex } = socket.data;
+    const { roomId } = socket.data;
     if (!roomId || !rooms.has(roomId)) return;
     const room = rooms.get(roomId);
-    // advance turn
-    const nextTurn = room.currentTurn === 1 ? 2 : 1;
-    room.currentTurn = nextTurn;
 
-    // determine winner if defeated
-    let winner = null;
     if (defeated) {
-      winner = shooterIndex;
-      // close room
-      io.in(roomId).emit('shot_result', { cell, shooterIndex, nextTurn, hit, sunk, defeated: true, winner });
-      rooms.delete(roomId);
+      io.in(roomId).emit('shot_result', {
+        cell, shooterIndex, nextTurn: shooterIndex, hit, sunk, defeated: true, winner: shooterIndex,
+      });
+      closeRoom(roomId);
       return;
     }
+
+    // Honour the room's turn rule: with "encadeado" a hit keeps the
+    // turn, so the server must agree with the clients or the two sides
+    // disagree about whose turn it is.
+    const chains = room.config?.turnRule !== 'alternado';
+    const nextTurn = hit && chains ? shooterIndex : shooterIndex === 1 ? 2 : 1;
+    room.currentTurn = nextTurn;
 
     io.in(roomId).emit('shot_result', { cell, shooterIndex, nextTurn, hit, sunk, defeated: false });
   });
 
-  socket.on('decline_match', () => {
-    const { roomId } = socket.data;
-    if (!roomId || !rooms.has(roomId)) return;
-    const room = rooms.get(roomId);
-    // notify both
-    io.in(roomId).emit('match_declined');
-    // requeue remaining sockets: pick first other socket as waiting
-    const other = room.players.find((id) => id !== socket.id);
-    rooms.delete(roomId);
-    if (other && io.sockets.sockets.get(other)) {
-      waitingSocket = io.sockets.sockets.get(other);
-      waitingSocket.emit('waiting_for_opponent');
-    }
-  });
-
-  socket.on('player_info', ({ name }) => {
-    const playerName = name || 'Jogador';
-    connectedPlayers.set(socket.id, { id: socket.id, name: playerName });
-    io.emit('online_players', Array.from(connectedPlayers.values()).map((player) => player.name));
-  });
-
   socket.on('forfeit_battle', () => {
     const { roomId, playerIndex } = socket.data;
-    if (!roomId || !rooms.has(roomId)) {
-      return;
-    }
-
-    const room = rooms.get(roomId);
-    const loser = playerIndex;
-    const winner = loser === 1 ? 2 : 1;
-    io.in(roomId).emit('battle_forfeit', { winner, loser });
-    rooms.delete(roomId);
+    if (!roomId || !rooms.has(roomId)) return;
+    const winner = playerIndex === 1 ? 2 : 1;
+    io.in(roomId).emit('battle_forfeit', { winner, loser: playerIndex });
+    closeRoom(roomId);
   });
 
   socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
     connectedPlayers.delete(socket.id);
-    io.emit('online_players', Array.from(connectedPlayers.values()).map((player) => player.name));
-
-    if (waitingSocket === socket) {
-      waitingSocket = null;
-    }
+    leaveQueue(socket);
 
     const { roomId } = socket.data;
     if (roomId && rooms.has(roomId)) {
       const room = rooms.get(roomId);
-      room.players = room.players.filter((id) => id !== socket.id);
-      if (room.players.length === 0) {
-        rooms.delete(roomId);
-      } else {
-        const remainingSocketId = room.players[0];
-        io.to(remainingSocketId).emit('opponent_left');
-        rooms.delete(roomId);
-      }
+      room.players
+        .filter((id) => id !== socket.id)
+        .forEach((id) => io.to(id).emit('opponent_left'));
+      closeRoom(roomId);
     }
+    broadcastPlayers();
   });
 });
 

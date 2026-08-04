@@ -7,6 +7,7 @@
 export const state = {
   // networking / turn control
   playerIndex: null,
+  opponentName: null,
   isPlayerTurn: false,
   canShoot: true,
   turnClockInterval: null,

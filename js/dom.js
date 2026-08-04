@@ -35,6 +35,7 @@ export const dom = {
   playerList: byId('player-list'),
   historyList: byId('history-list'),
   playerName: byId('player-name'),
+  appVersion: byId('app-version'),
   patentIcon: byId('patent-icon'),
   fleetConfigButton: byId('fleet-config-button'),
   fleetConfigStatus: byId('fleet-config-status'),
@@ -84,6 +85,9 @@ export const dom = {
   roomPanel: byId('room-panel'),
   closeRoomButton: byId('close-room-button'),
   startMatchButton: byId('start-match-button'),
+  findMatchButton: byId('find-match-button'),
+  cancelMatchButton: byId('cancel-match-button'),
+  matchmakingStatus: byId('matchmaking-status'),
   roomFleetStatus: byId('room-fleet-status'),
   roomConfigureFleet: byId('room-configure-fleet'),
 

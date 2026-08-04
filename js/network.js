@@ -14,6 +14,14 @@ export function emitFireResponse(payload) {
   socket.emit('fire_response', payload);
 }
 
+export function emitFindMatch(config) {
+  socket.emit('find_match', { config });
+}
+
+export function emitCancelMatch() {
+  socket.emit('cancel_match');
+}
+
 export function emitDeclineMatch() {
   socket.emit('decline_match');
 }

@@ -26,11 +26,25 @@ export function setTargetBadge(text) {
   }
 }
 
+// The server now sends objects with a status, so the lobby can show who
+// is actually available instead of a flat list of names.
 export function fillOnlinePlayers(players = []) {
   if (!dom.playerList) return;
-  dom.playerList.innerHTML = players.length
-    ? players.map((player) => `<li>${player}</li>`).join('')
-    : '<li>Aguardando combatentes...</li>';
+
+  if (!players.length) {
+    dom.playerList.innerHTML = '<li>Nenhum jogador online.</li>';
+    return;
+  }
+
+  dom.playerList.innerHTML = players
+    .map((p) => {
+      const name = typeof p === 'string' ? p : p.name;
+      const status = typeof p === 'string' ? '' : p.status || '';
+      const cls =
+        status === 'Em combate' ? 'status-busy' : status === 'Procurando partida' ? 'status-searching' : 'status-idle';
+      return `<li class="player-row"><span>${name}</span><span class="player-status ${cls}">${status}</span></li>`;
+    })
+    .join('');
 }
 
 export function fillPlayerHistory(email = 'Jogador') {

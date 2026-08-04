@@ -4,8 +4,9 @@ import { generateGridCells, generateGridCoords } from './board.js';
 import { toggleAudioMuted } from './audio.js';
 import { openOptions, closeOptions, fillOnlinePlayers, fillPlayerHistory, showBattleScreen, showLobbyScreen } from './ui.js';
 import { setPowerUpsEnabled } from './powerups.js';
-import { socket } from './network.js';
+import { socket, emitFindMatch, emitCancelMatch } from './network.js';
 import { applyMatchConfig, matchConfig } from './matchConfig.js';
+import { APP_VERSION } from './version.js';
 import { wireFleetSetupControls, enterFleetSetup } from './placement.js';
 import {
   handleSignIn,
@@ -48,6 +49,8 @@ function rebuildBoards() {
 
 restoreRememberPreference();
 watchAuthState();
+
+if (dom.appVersion) dom.appVersion.textContent = `v${APP_VERSION}`;
 
 applyMatchConfig();
 rebuildBoards();
@@ -127,6 +130,44 @@ document.querySelectorAll('.room-options').forEach((group) => {
     rebuildBoards();
   });
 });
+
+function setSearching(on) {
+  dom.findMatchButton?.classList.toggle('hidden', on);
+  dom.cancelMatchButton?.classList.toggle('hidden', !on);
+  if (dom.startMatchButton) dom.startMatchButton.disabled = on || !state.fleetSaved;
+  if (dom.matchmakingStatus) {
+    dom.matchmakingStatus.textContent = on ? 'Procurando adversário...' : '';
+  }
+}
+
+dom.findMatchButton?.addEventListener('click', () => {
+  if (!state.fleetSaved) {
+    if (dom.matchmakingStatus) dom.matchmakingStatus.textContent = 'Configure sua frota antes de buscar partida.';
+    return;
+  }
+  applyMatchConfig({
+    powerUps: Boolean(dom.roomPowerUps?.checked),
+    music: Boolean(dom.roomMusic?.checked),
+  });
+  setPowerUpsEnabled(matchConfig.powerUps);
+  setSearching(true);
+  emitFindMatch(matchConfig);
+});
+
+dom.cancelMatchButton?.addEventListener('click', () => {
+  emitCancelMatch();
+  setSearching(false);
+});
+
+socket.on('match_cancelled', () => setSearching(false));
+socket.on('match_found', () => {
+  setSearching(false);
+  dom.roomPanel?.classList.add('hidden');
+});
+
+// The room config can arrive from the opponent, so the grids may need
+// to be rebuilt at a different size than the one chosen locally.
+document.addEventListener('rebuild-boards', rebuildBoards);
 
 dom.startMatchButton?.addEventListener('click', () => {
   applyMatchConfig({
