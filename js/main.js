@@ -127,8 +127,21 @@ document.querySelectorAll('.room-options').forEach((group) => {
     if (!btn) return;
     group.querySelectorAll('.room-option').forEach((b) => b.classList.remove('room-option-on'));
     btn.classList.add('room-option-on');
-    applyMatchConfig({ [group.dataset.key]: btn.dataset.value });
+    const { sizeChanged } = applyMatchConfig({ [group.dataset.key]: btn.dataset.value });
     rebuildBoards();
+
+    // The saved fleet belongs to the previous board size and cannot be
+    // carried over, so require a fresh setup instead of playing with
+    // coordinates that no longer mean anything.
+    if (sizeChanged && state.fleetSaved) {
+      state.fleetSaved = false;
+      state.placement = null;
+      state.playerFleet = null;
+      if (dom.matchmakingStatus) {
+        dom.matchmakingStatus.textContent = 'Mapa alterado: reconfigure sua frota para o novo tabuleiro.';
+      }
+    }
+    syncRoomFleetState();
   });
 });
 
@@ -261,7 +274,7 @@ dom.challengeAccept?.addEventListener('click', () => {
     alert('Configure e salve sua frota antes de aceitar.');
     return;
   }
-  if (pendingChallengeFrom) emitAcceptChallenge(pendingChallengeFrom);
+  if (pendingChallengeFrom) emitAcceptChallenge(pendingChallengeFrom, matchConfig);
   pendingChallengeFrom = null;
 });
 

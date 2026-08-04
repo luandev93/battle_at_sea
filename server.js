@@ -15,7 +15,10 @@ const io = new Server(server, { cors: { origin: '*' } });
 // no longer pairs you with a stranger. Previously a socket was matched
 // the instant the page loaded, before the player had a fleet, so the
 // client immediately declined and PvP could never actually start.
-let waitingSocket = null;
+// A single waiting slot meant a second player queueing simply evicted
+// the first, who then waited forever. This is a real queue, and players
+// are only paired with someone who chose the same map.
+const queue = [];
 const rooms = new Map();
 const connectedPlayers = new Map();
 
@@ -39,9 +42,12 @@ function setStatus(socketId, status) {
 }
 
 function leaveQueue(socket) {
-  if (waitingSocket && waitingSocket.id === socket.id) {
-    waitingSocket = null;
-  }
+  const i = queue.findIndex((s) => s.id === socket.id);
+  if (i !== -1) queue.splice(i, 1);
+}
+
+function mapOf(socket) {
+  return socket.data.pendingConfig?.map || 'padrao';
 }
 
 function createMatchRoom(a, b, config) {
@@ -100,17 +106,22 @@ io.on('connection', (socket) => {
   // Explicit matchmaking, triggered by the player pressing "Procurar".
   socket.on('find_match', ({ config } = {}) => {
     if (socket.data.roomId) return;
+    const map = config?.map || 'padrao';
 
-    if (waitingSocket && waitingSocket.connected && waitingSocket.id !== socket.id) {
-      const opponent = waitingSocket;
-      waitingSocket = null;
-      // The player who was waiting owns the rules of the room.
+    // Fleets are laid out for one board size, so two players can only
+    // meet if they queued for the same map. Pairing across maps handed
+    // one of them a fleet whose coordinates no longer existed.
+    leaveQueue(socket);
+    socket.data.pendingConfig = config || {};
+
+    const idx = queue.findIndex((s) => s.connected && s.id !== socket.id && mapOf(s) === map);
+    if (idx !== -1) {
+      const [opponent] = queue.splice(idx, 1);
       createMatchRoom(opponent, socket, opponent.data.pendingConfig || config || {});
       return;
     }
 
-    waitingSocket = socket;
-    socket.data.pendingConfig = config || {};
+    queue.push(socket);
     setStatus(socket.id, 'Procurando partida');
     socket.emit('waiting_for_opponent');
   });
@@ -138,10 +149,21 @@ io.on('connection', (socket) => {
     setStatus(socket.id, 'Desafiando');
   });
 
-  socket.on('accept_challenge', ({ fromId } = {}) => {
+  socket.on('accept_challenge', ({ fromId, config } = {}) => {
     const challenger = io.sockets.sockets.get(fromId);
     if (!challenger || challenger.data.roomId || socket.data.roomId) {
       socket.emit('challenge_failed', { reason: 'O desafio expirou.' });
+      return;
+    }
+
+    const theirMap = challenger.data.pendingConfig?.map || 'padrao';
+    const myMap = config?.map || 'padrao';
+    if (theirMap !== myMap) {
+      socket.emit('challenge_failed', {
+        reason: `O desafiante joga no mapa "${theirMap}" e sua frota é do mapa "${myMap}". Reconfigure a frota nesse mapa para aceitar.`,
+      });
+      challenger.emit('challenge_declined', { byName: connectedPlayers.get(socket.id)?.name || 'Jogador' });
+      setStatus(fromId, 'No lobby');
       return;
     }
     leaveQueue(challenger);

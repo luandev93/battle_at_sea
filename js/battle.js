@@ -462,11 +462,12 @@ export function handleMatchFound({ playerIndex, isPlayerTurn, config, opponent }
   state.isPlayerTurn = isPlayerTurn;
   state.isSoloMode = false;
 
-  // Both sides must play on the same board with the same rules, so the
-  // room's config wins over whatever was selected locally.
+  // The server only pairs players queued for the same map, so only the
+  // rules travel with the room. Resizing the board here would invalidate
+  // the fleet the player already placed.
   if (config && Object.keys(config).length) {
-    applyMatchConfig(config);
-    document.dispatchEvent(new CustomEvent('rebuild-boards'));
+    const { map, ...rules } = config;
+    applyMatchConfig(rules);
   }
   if (opponent) state.opponentName = opponent;
 

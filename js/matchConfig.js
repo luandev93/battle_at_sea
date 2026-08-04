@@ -55,8 +55,14 @@ export function chainsOnHit() {
 
 // Applies the chosen map immediately so the grids rebuild at the right
 // dimension before a match begins.
+// Returns true when the applied config changed the board dimension. A
+// fleet is stored as coordinates for one specific board size, so any
+// change invalidates it — that mismatch corrupted both solo and PvP
+// matches when the map was switched after saving.
 export function applyMatchConfig(partial = {}) {
+  const before = getMapSize();
   Object.assign(matchConfig, partial);
-  setGridSize(getMapSize());
-  return matchConfig;
+  const after = getMapSize();
+  setGridSize(after);
+  return { config: matchConfig, sizeChanged: before !== after };
 }

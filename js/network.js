@@ -18,8 +18,8 @@ export function emitChallenge(targetId, config) {
   socket.emit('challenge_player', { targetId, config });
 }
 
-export function emitAcceptChallenge(fromId) {
-  socket.emit('accept_challenge', { fromId });
+export function emitAcceptChallenge(fromId, config) {
+  socket.emit('accept_challenge', { fromId, config });
 }
 
 export function emitDeclineChallenge(fromId) {

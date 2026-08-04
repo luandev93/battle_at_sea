@@ -164,7 +164,7 @@ function promptForName(uid, fallback) {
 }
 
 function enterLobbyAsUser(user) {
-  const playerLabel = user.email || 'Capitão';
+  const playerLabel = user.email || 'Player';
   if (dom.playerName) dom.playerName.textContent = playerLabel;
   fillPlayerHistory(loadStats(state.currentPlayerId || user.uid));
 

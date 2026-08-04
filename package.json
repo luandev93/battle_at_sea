@@ -1,6 +1,6 @@
 {
   "name": "battle_at_sea",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Jogo de Batalha Naval multiplayer com IA, feito com Express + Socket.IO no backend e JS modular no frontend.",
   "main": "server.js",
   "type": "commonjs",
