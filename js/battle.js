@@ -108,7 +108,7 @@ function processPlayerShot(cell) {
 
   if (hit && sunk && isFleetSunk(state.soloEnemyFleet)) {
     finishMatch('Sua frota dominou o mar. O adversário foi ao fundo.', true);
-    awardPoints(1, 'solo_win');
+    awardPoints(2, 'solo_win');
     return;
   }
 
@@ -516,7 +516,7 @@ export function handleShotResult(payload) {
   }
   if (defeated) {
     setBattleStatus(winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.');
-    if (winner === state.playerIndex) awardPoints(3, 'pvp_win');
+    if (winner === state.playerIndex) awardPoints(5, 'pvp_win');
   }
 
   if (defeated) {
@@ -537,7 +537,7 @@ export function handleShotResult(payload) {
 export function handleBattleForfeit({ winner }) {
   if (state.playerIndex === winner) {
     setBattleStatus('Vitória por W.O.! Seu oponente desistiu.');
-    awardPoints(5, 'pvp_win');
+    awardPoints(3, 'pvp_win');
   } else {
     setBattleStatus('Sua equipe perdeu por W.O..');
   }

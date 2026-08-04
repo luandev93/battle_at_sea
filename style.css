@@ -319,6 +319,26 @@ button:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.patent-block {
+  display: grid;
+  line-height: 1.15;
+}
+
+.patent-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffd98a;
+}
+
+.patent-progress {
+  font-size: 0.64rem;
+  color: rgba(150, 200, 235, 0.75);
+}
+
+.auth-success {
+  color: #6fe0a0 !important;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;

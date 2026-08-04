@@ -210,6 +210,7 @@ export function watchAuthState() {
 
 export async function handleSignIn() {
   clearError();
+  dom.errorMessage?.classList.remove('auth-success');
   const { email, password } = getCredentials();
 
   if (!email || !password) {
@@ -231,12 +232,36 @@ export async function handleSignIn() {
     saveRememberPreference(user.email || email);
     enterLobbyAsUser(user);
   } catch (error) {
-    displayError(error.message || 'Falha ao entrar. Verifique suas credenciais.');
+    displayError(describeAuthError(error));
   }
+}
+
+const AUTH_ERRORS = {
+  'auth/email-already-in-use': 'Este email já possui uma conta. Tente entrar.',
+  'auth/invalid-email': 'Email inválido. Confira o endereço digitado.',
+  'auth/weak-password': 'Senha muito fraca. Use ao menos 6 caracteres.',
+  'auth/missing-password': 'Digite uma senha.',
+  'auth/wrong-password': 'Senha incorreta.',
+  'auth/user-not-found': 'Não existe conta com este email.',
+  'auth/invalid-credential': 'Email ou senha incorretos.',
+  'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
+  'auth/network-request-failed': 'Sem conexão com o servidor. Verifique sua internet.',
+  'auth/operation-not-allowed': 'Cadastro por email está desativado no Firebase Console.',
+};
+
+function describeAuthError(error) {
+  return AUTH_ERRORS[error?.code] || error?.message || 'Algo deu errado. Tente novamente.';
+}
+
+function displaySuccess(message) {
+  if (!dom.errorMessage) return;
+  dom.errorMessage.textContent = message;
+  dom.errorMessage.classList.add('auth-success');
 }
 
 export async function handleSignUp() {
   clearError();
+  dom.errorMessage?.classList.remove('auth-success');
   const { email, password } = getCredentials();
 
   if (!email || !password) {
@@ -247,15 +272,21 @@ export async function handleSignUp() {
     displayError('Digite um email válido para criar a conta.');
     return;
   }
+  // Checked here so the player gets a clear message instead of Firebase's
+  // raw English rejection after the request round-trips.
+  if (password.length < 6) {
+    displayError('A senha precisa ter ao menos 6 caracteres.');
+    return;
+  }
 
   try {
     await setPersistence(auth, getPersistenceMode());
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await sendEmailVerification(userCredential.user);
     await signOut(auth);
-    displayError('Conta criada. Verifique seu email e confirme antes de entrar.');
+    displaySuccess('Conta criada! Confirme o link enviado ao seu email e depois entre.');
   } catch (error) {
-    displayError(error.message || 'Falha ao criar conta. Tente novamente.');
+    displayError(describeAuthError(error));
   }
 }
 
@@ -272,7 +303,7 @@ export async function handlePasswordReset() {
     await sendPasswordResetEmail(auth, email);
     displayError('Email de recuperação enviado. Verifique sua caixa de entrada.');
   } catch (error) {
-    displayError(error.message || 'Não foi possível enviar a recuperação. Tente novamente.');
+    displayError(describeAuthError(error));
   }
 }
 

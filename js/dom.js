@@ -37,6 +37,8 @@ export const dom = {
   playerName: byId('player-name'),
   appVersion: byId('app-version'),
   patentIcon: byId('patent-icon'),
+  patentName: byId('patent-name'),
+  patentProgress: byId('patent-progress'),
   fleetConfigButton: byId('fleet-config-button'),
   fleetConfigStatus: byId('fleet-config-status'),
   viewHistoryButton: byId('view-history-button'),
