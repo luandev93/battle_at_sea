@@ -3,8 +3,9 @@ import { state } from './state.js';
 import { generateGridCells, generateGridCoords } from './board.js';
 import { toggleAudioMuted } from './audio.js';
 import { openOptions, closeOptions, fillOnlinePlayers, fillPlayerHistory, showBattleScreen, showLobbyScreen } from './ui.js';
+import { loadStats } from './stats.js';
 import { setPowerUpsEnabled } from './powerups.js';
-import { socket, emitFindMatch, emitCancelMatch } from './network.js';
+import { socket, emitFindMatch, emitCancelMatch, emitChallenge, emitAcceptChallenge, emitDeclineChallenge } from './network.js';
 import { applyMatchConfig, matchConfig } from './matchConfig.js';
 import { APP_VERSION } from './version.js';
 import { wireFleetSetupControls, enterFleetSetup } from './placement.js';
@@ -185,7 +186,7 @@ dom.toggleAudioButton?.addEventListener('click', toggleAudioMuted);
 dom.optionsButton?.addEventListener('click', openOptions);
 dom.closeOptionsButton?.addEventListener('click', closeOptions);
 dom.powerUpToggle?.addEventListener('change', (event) => setPowerUpsEnabled(event.target.checked));
-dom.viewHistoryButton?.addEventListener('click', () => fillPlayerHistory());
+dom.viewHistoryButton?.addEventListener('click', () => fillPlayerHistory(loadStats(state.currentPlayerId)));
 
 dom.fleetConfigButton?.addEventListener('click', () => {
   enterFleetSetup();
@@ -226,7 +227,61 @@ socket.on('match_found', handleMatchFound);
 socket.on('shot_result', handleShotResult);
 socket.on('battle_forfeit', handleBattleForfeit);
 socket.on('waiting_for_opponent', handleWaitingForOpponent);
+socket.on('your_id', ({ id }) => {
+  state.socketId = id;
+});
+
 socket.on('online_players', fillOnlinePlayers);
+
+// Challenge a specific player straight from the online list.
+dom.playerList?.addEventListener('click', (event) => {
+  const btn = event.target.closest('.challenge-button');
+  if (!btn) return;
+
+  if (!state.fleetSaved) {
+    alert('Configure e salve sua frota antes de desafiar alguém.');
+    return;
+  }
+  emitChallenge(btn.dataset.id, matchConfig);
+});
+
+let pendingChallengeFrom = null;
+
+socket.on('challenge_received', ({ fromId, fromName }) => {
+  pendingChallengeFrom = fromId;
+  if (dom.challengeText) {
+    dom.challengeText.textContent = `${fromName} quer enfrentar você. Sua frota salva será usada nesta partida.`;
+  }
+  dom.challengePanel?.classList.remove('hidden');
+});
+
+dom.challengeAccept?.addEventListener('click', () => {
+  dom.challengePanel?.classList.add('hidden');
+  if (!state.fleetSaved) {
+    alert('Configure e salve sua frota antes de aceitar.');
+    return;
+  }
+  if (pendingChallengeFrom) emitAcceptChallenge(pendingChallengeFrom);
+  pendingChallengeFrom = null;
+});
+
+dom.challengeDecline?.addEventListener('click', () => {
+  dom.challengePanel?.classList.add('hidden');
+  if (pendingChallengeFrom) emitDeclineChallenge(pendingChallengeFrom);
+  pendingChallengeFrom = null;
+});
+
+socket.on('challenge_sent', ({ toName }) => {
+  if (dom.matchmakingStatus) dom.matchmakingStatus.textContent = `Desafio enviado a ${toName}. Aguardando resposta...`;
+});
+
+socket.on('challenge_declined', ({ byName }) => {
+  if (dom.matchmakingStatus) dom.matchmakingStatus.textContent = `${byName} recusou o desafio.`;
+});
+
+socket.on('challenge_failed', ({ reason }) => {
+  if (dom.matchmakingStatus) dom.matchmakingStatus.textContent = reason || 'Não foi possível desafiar.';
+});
 socket.on('opponent_left', handleOpponentLeft);
 
 // expose minimal debug handle in dev tools without polluting the module scope

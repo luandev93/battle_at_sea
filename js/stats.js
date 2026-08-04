@@ -40,12 +40,12 @@ export function pointsNeeded(points = 0) {
 }
 
 export function loadStats(id) {
-  if (!id) return { points: 0, winsPvP: 0, winsSolo: 0 };
+  if (!id) return { points: 0, winsPvP: 0, winsSolo: 0, losses: 0 };
   try {
     const raw = localStorage.getItem(`bas:stats:${id}`);
-    return raw ? JSON.parse(raw) : { points: 0, winsPvP: 0, winsSolo: 0 };
+    return raw ? JSON.parse(raw) : { points: 0, winsPvP: 0, winsSolo: 0, losses: 0 };
   } catch (e) {
-    return { points: 0, winsPvP: 0, winsSolo: 0 };
+    return { points: 0, winsPvP: 0, winsSolo: 0, losses: 0 };
   }
 }
 
@@ -107,6 +107,7 @@ export function awardPoints(amount, type = 'generic') {
   stats.points = (stats.points || 0) + amount;
   if (type === 'pvp_win') stats.winsPvP = (stats.winsPvP || 0) + 1;
   if (type === 'solo_win') stats.winsSolo = (stats.winsSolo || 0) + 1;
+  if (type === 'pvp_loss' || type === 'solo_loss') stats.losses = (stats.losses || 0) + 1;
 
   saveStats(state.currentPlayerId, stats);
   saveStatsToFirestore(state.currentPlayerId, stats).catch(() => {});

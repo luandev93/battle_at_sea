@@ -167,6 +167,7 @@ function botTakeTurn() {
   }
 
   if (hit && sunk && isFleetSunk(state.playerFleet)) {
+    awardPoints(0, 'solo_loss');
     finishMatch('Sua frota foi afundada. O adversário venceu.', false);
     return;
   }
@@ -524,6 +525,7 @@ export function handleShotResult(payload) {
       winner === state.playerIndex ? 'Você venceu a partida!' : 'Você perdeu a partida.',
       winner === state.playerIndex
     );
+    if (winner !== state.playerIndex) awardPoints(0, 'pvp_loss');
     return;
   }
 

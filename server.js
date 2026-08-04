@@ -86,6 +86,9 @@ function closeRoom(roomId) {
 
 io.on('connection', (socket) => {
   connectedPlayers.set(socket.id, { id: socket.id, name: 'Jogador', status: 'No lobby' });
+  // The client needs its own id to know which row in the player list is
+  // itself, and to address challenges.
+  socket.emit('your_id', { id: socket.id });
   broadcastPlayers();
 
   socket.on('player_info', ({ name }) => {
@@ -116,6 +119,45 @@ io.on('connection', (socket) => {
     leaveQueue(socket);
     setStatus(socket.id, 'No lobby');
     socket.emit('match_cancelled');
+  });
+
+  // --- Direct challenges -------------------------------------------
+  socket.on('challenge_player', ({ targetId, config } = {}) => {
+    const target = io.sockets.sockets.get(targetId);
+    if (!target || target.data.roomId || socket.data.roomId) {
+      socket.emit('challenge_failed', { reason: 'Jogador indisponível no momento.' });
+      return;
+    }
+
+    socket.data.pendingConfig = config || {};
+    target.emit('challenge_received', {
+      fromId: socket.id,
+      fromName: connectedPlayers.get(socket.id)?.name || 'Jogador',
+    });
+    socket.emit('challenge_sent', { toName: connectedPlayers.get(targetId)?.name || 'Jogador' });
+    setStatus(socket.id, 'Desafiando');
+  });
+
+  socket.on('accept_challenge', ({ fromId } = {}) => {
+    const challenger = io.sockets.sockets.get(fromId);
+    if (!challenger || challenger.data.roomId || socket.data.roomId) {
+      socket.emit('challenge_failed', { reason: 'O desafio expirou.' });
+      return;
+    }
+    leaveQueue(challenger);
+    leaveQueue(socket);
+    // The challenger's room settings apply.
+    createMatchRoom(challenger, socket, challenger.data.pendingConfig || {});
+  });
+
+  socket.on('decline_challenge', ({ fromId } = {}) => {
+    const challenger = io.sockets.sockets.get(fromId);
+    if (challenger) {
+      challenger.emit('challenge_declined', {
+        byName: connectedPlayers.get(socket.id)?.name || 'Jogador',
+      });
+      setStatus(fromId, 'No lobby');
+    }
   });
 
   socket.on('fire_cannon', ({ cell }) => {

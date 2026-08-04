@@ -100,6 +100,11 @@ export const dom = {
   confirmNameButton: byId('confirm-name-button'),
 
   // end of match
+  challengePanel: byId('challenge-panel'),
+  challengeText: byId('challenge-text'),
+  challengeAccept: byId('challenge-accept'),
+  challengeDecline: byId('challenge-decline'),
+
   resultPanel: byId('result-panel'),
   resultTitle: byId('result-title'),
   resultMessage: byId('result-message'),

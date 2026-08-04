@@ -1724,6 +1724,32 @@ button:hover {
   white-space: nowrap;
 }
 
+.challenge-button {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #06202f;
+  background: linear-gradient(180deg, #6fd0ff, #35a5e0);
+  border: 1px solid rgba(160, 220, 255, 0.6);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.challenge-button:active { transform: scale(0.95); }
+
+.player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-you {
+  font-size: 0.66rem;
+  color: rgba(150, 200, 235, 0.6);
+  font-style: italic;
+}
+
 .status-idle { background: rgba(140, 190, 230, 0.18); color: #cfe6f7; }
 .status-searching { background: rgba(255, 200, 90, 0.22); color: #ffd98a; }
 .status-busy { background: rgba(255, 110, 110, 0.22); color: #ffb0b0; }

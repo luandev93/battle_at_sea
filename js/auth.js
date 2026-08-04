@@ -14,7 +14,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { dom } from './dom.js';
 import { state } from './state.js';
 import { displayError, clearError, fillPlayerHistory, showLobbyScreen, showLoginScreen, setBattleStatus } from './ui.js';
-import { updateStatsUI, loadStatsFromFirestore, saveStats } from './stats.js';
+import { updateStatsUI, loadStatsFromFirestore, saveStats, loadStats } from './stats.js';
 import { loadFleetFromFirestore } from './placement.js';
 import { emitPlayerInfo } from './network.js';
 
@@ -166,7 +166,7 @@ function promptForName(uid, fallback) {
 function enterLobbyAsUser(user) {
   const playerLabel = user.email || 'Capitão';
   if (dom.playerName) dom.playerName.textContent = playerLabel;
-  fillPlayerHistory(playerLabel);
+  fillPlayerHistory(loadStats(state.currentPlayerId || user.uid));
 
   state.currentPlayerId = user.uid || user.email || playerLabel;
   updateStatsUI(state.currentPlayerId);
@@ -178,6 +178,7 @@ function enterLobbyAsUser(user) {
       if (remoteStats) {
         saveStats(state.currentPlayerId, remoteStats);
         updateStatsUI(state.currentPlayerId);
+        fillPlayerHistory(remoteStats);
       }
     })
     .catch(() => {});

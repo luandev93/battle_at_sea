@@ -14,6 +14,18 @@ export function emitFireResponse(payload) {
   socket.emit('fire_response', payload);
 }
 
+export function emitChallenge(targetId, config) {
+  socket.emit('challenge_player', { targetId, config });
+}
+
+export function emitAcceptChallenge(fromId) {
+  socket.emit('accept_challenge', { fromId });
+}
+
+export function emitDeclineChallenge(fromId) {
+  socket.emit('decline_challenge', { fromId });
+}
+
 export function emitFindMatch(config) {
   socket.emit('find_match', { config });
 }

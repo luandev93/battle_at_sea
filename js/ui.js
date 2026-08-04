@@ -39,24 +39,52 @@ export function fillOnlinePlayers(players = []) {
   dom.playerList.innerHTML = players
     .map((p) => {
       const name = typeof p === 'string' ? p : p.name;
+      const id = typeof p === 'string' ? null : p.id;
       const status = typeof p === 'string' ? '' : p.status || '';
+      const isSelf = id && id === state.socketId;
       const cls =
         status === 'Em combate' ? 'status-busy' : status === 'Procurando partida' ? 'status-searching' : 'status-idle';
-      return `<li class="player-row"><span>${name}</span><span class="player-status ${cls}">${status}</span></li>`;
+
+      // Only idle opponents can be challenged; yourself never can.
+      const canChallenge = id && !isSelf && status === 'No lobby';
+      const action = isSelf
+        ? '<span class="player-you">você</span>'
+        : canChallenge
+          ? `<button type="button" class="challenge-button" data-id="${id}" data-name="${name}">Desafiar</button>`
+          : `<span class="player-status ${cls}">${status}</span>`;
+
+      return `<li class="player-row"><span class="player-name">${name}</span>${action}</li>`;
     })
     .join('');
 }
 
-export function fillPlayerHistory(email = 'Jogador') {
+// Reads the player's actual saved stats. This panel used to show fixed
+// invented numbers (12 vitórias, 63%...) to everyone, including accounts
+// created seconds earlier.
+export function fillPlayerHistory(stats = null) {
   if (!dom.historyList) return;
-  const history = [
-    `Jogador: ${email}`,
-    `Última vitória: 3 dias atrás`,
-    `Derrotas: 7`,
-    `Vitórias: 12`,
-    `Taxa de vitória: 63%`,
-  ];
-  dom.historyList.innerHTML = history.map((item) => `<li>${item}</li>`).join('');
+
+  const s = stats || { points: 0, winsPvP: 0, winsSolo: 0, losses: 0 };
+  const wins = (s.winsPvP || 0) + (s.winsSolo || 0);
+  const losses = s.losses || 0;
+  const played = wins + losses;
+  const rate = played ? Math.round((wins / played) * 100) : 0;
+
+  if (!played) {
+    dom.historyList.innerHTML =
+      '<li>Nenhuma partida disputada ainda.</li><li>Vença combates para subir de patente.</li>';
+    return;
+  }
+
+  dom.historyList.innerHTML = [
+    `Partidas: ${played}`,
+    `Vitórias: ${wins} (${s.winsPvP || 0} online · ${s.winsSolo || 0} solo)`,
+    `Derrotas: ${losses}`,
+    `Taxa de vitória: ${rate}%`,
+    `Pontos: ${s.points || 0}`,
+  ]
+    .map((i) => `<li>${i}</li>`)
+    .join('');
 }
 
 export function showLoginScreen() {
